@@ -805,6 +805,7 @@ const UserResource = z
         week_start: Weekday,
         calendar_week_days: z.number().int(),
         no_project_color: z.string(),
+        show_missing_ticket_hints: z.boolean(),
     })
     .passthrough();
 const UserUpdateRequest = z
@@ -816,6 +817,7 @@ const UserUpdateRequest = z
         week_start: Weekday,
         calendar_week_days: z.number().int().gte(1).lte(7),
         no_project_color: z.string(),
+        show_missing_ticket_hints: z.boolean(),
     })
     .partial()
     .passthrough();

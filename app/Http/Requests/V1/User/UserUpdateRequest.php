@@ -75,6 +75,9 @@ class UserUpdateRequest extends BaseFormRequest
             'no_project_color' => [
                 new ColorRule,
             ],
+            'show_missing_ticket_hints' => [
+                'boolean',
+            ],
         ];
     }
 
@@ -106,6 +109,11 @@ class UserUpdateRequest extends BaseFormRequest
     public function getNoProjectColor(): ?string
     {
         return $this->has('no_project_color') ? (string) $this->input('no_project_color') : null;
+    }
+
+    public function getShowMissingTicketHints(): ?bool
+    {
+        return $this->has('show_missing_ticket_hints') ? $this->boolean('show_missing_ticket_hints') : null;
     }
 
     public function hasPhotoKey(): bool

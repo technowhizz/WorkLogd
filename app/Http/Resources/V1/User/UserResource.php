@@ -40,6 +40,8 @@ class UserResource extends BaseResource
             'calendar_week_days' => $this->resource->calendar_week_days,
             /** @var string $no_project_color Color used for time entries without a project (f.e. #6b7280 or #6b7280cc) */
             'no_project_color' => $this->resource->no_project_color,
+            /** @var bool $show_missing_ticket_hints Whether to mark work entries whose description contains no Jira issue key */
+            'show_missing_ticket_hints' => $this->resource->show_missing_ticket_hints,
         ];
     }
 }

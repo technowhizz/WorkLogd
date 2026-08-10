@@ -48,6 +48,7 @@ class ShareInertiaData
                         'week_start' => $user->week_start,
                         'calendar_week_days' => $user->calendar_week_days,
                         'no_project_color' => $user->no_project_color,
+                        'show_missing_ticket_hints' => $user->show_missing_ticket_hints,
                         'profile_photo_url' => $user->profile_photo_url,
                         'two_factor_enabled' => Features::enabled(Features::twoFactorAuthentication())
                             && ! is_null($user->two_factor_secret),

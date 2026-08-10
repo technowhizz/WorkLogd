@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     describeInvalidRange,
     describeSkipReason,
@@ -8,6 +8,154 @@ import {
     toExternalSyncBadges,
     type MissingReferenceCandidate,
 } from './jira';
+
+const mocks = vi.hoisted(() => ({
+    sharedUser: {} as Record<string, unknown>,
+    updateUser: vi.fn(),
+    addNotification: vi.fn(),
+}));
+
+vi.mock('@inertiajs/vue3', () => ({
+    usePage: () => ({
+        get props() {
+            return { auth: { user: mocks.sharedUser } };
+        },
+    }),
+}));
+
+vi.mock('@/packages/api/src', () => ({
+    api: {
+        updateUser: (...args: unknown[]) => mocks.updateUser(...args),
+    },
+}));
+
+vi.mock('@/utils/useUser', () => ({
+    getCurrentUserId: () => 'user-1',
+}));
+
+vi.mock('@/utils/notification', () => ({
+    useNotificationsStore: () => ({ addNotification: mocks.addNotification }),
+}));
+
+const LEGACY_KEY = 'solidtime:jira-missing-ticket-hints';
+
+/** The module keeps per-tab state, so every case needs its own copy of it. */
+async function loadJiraModule() {
+    vi.resetModules();
+    return import('./jira');
+}
+
+describe('showMissingTicketHintsSetting', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        window.localStorage.clear();
+        mocks.sharedUser = { id: 'user-1', show_missing_ticket_hints: false };
+        mocks.updateUser.mockResolvedValue({ data: {} });
+    });
+
+    it('reads the setting off the account, so it follows you to another device', async () => {
+        mocks.sharedUser = { id: 'user-1', show_missing_ticket_hints: true };
+
+        const { showMissingTicketHintsSetting } = await loadJiraModule();
+
+        expect(showMissingTicketHintsSetting.value).toBe(true);
+    });
+
+    it('stays off for a session whose shared props predate the setting', async () => {
+        mocks.sharedUser = { id: 'user-1' };
+
+        const { showMissingTicketHintsSetting } = await loadJiraModule();
+
+        expect(showMissingTicketHintsSetting.value).toBe(false);
+    });
+
+    it('saves to the account when it is switched on', async () => {
+        const { showMissingTicketHintsSetting } = await loadJiraModule();
+
+        showMissingTicketHintsSetting.value = true;
+
+        expect(showMissingTicketHintsSetting.value).toBe(true);
+        await vi.waitFor(() =>
+            expect(mocks.updateUser).toHaveBeenCalledWith(
+                { show_missing_ticket_hints: true },
+                { params: { user: 'user-1' } }
+            )
+        );
+    });
+
+    it('puts the switch back and says so if saving fails', async () => {
+        mocks.updateUser.mockRejectedValue(new Error('nope'));
+        const { showMissingTicketHintsSetting } = await loadJiraModule();
+
+        showMissingTicketHintsSetting.value = true;
+
+        await vi.waitFor(() => expect(mocks.addNotification).toHaveBeenCalled());
+        expect(showMissingTicketHintsSetting.value).toBe(false);
+    });
+
+    it('keeps a value left in localStorage and moves it onto the account', async () => {
+        window.localStorage.setItem(LEGACY_KEY, 'true');
+
+        const { showMissingTicketHintsSetting, adoptLegacyMissingTicketHintsSetting } =
+            await loadJiraModule();
+
+        // Honoured on this device straight away, even before the account knows about it
+        expect(showMissingTicketHintsSetting.value).toBe(true);
+        // Still there: it is only safe to drop once the account actually holds the value
+        expect(window.localStorage.getItem(LEGACY_KEY)).toBe('true');
+
+        adoptLegacyMissingTicketHintsSetting();
+
+        await vi.waitFor(() =>
+            expect(mocks.updateUser).toHaveBeenCalledWith(
+                { show_missing_ticket_hints: true },
+                { params: { user: 'user-1' } }
+            )
+        );
+        await vi.waitFor(() => expect(window.localStorage.getItem(LEGACY_KEY)).toBeNull());
+    });
+
+    /*
+     * Otherwise the setting is lost for good: the key is gone, the account never received it,
+     * and the next page load has nothing left to retry from.
+     */
+    it('keeps the stored value for a later retry when the account will not take it', async () => {
+        window.localStorage.setItem(LEGACY_KEY, 'true');
+        mocks.updateUser.mockRejectedValue(new Error('nope'));
+
+        const { adoptLegacyMissingTicketHintsSetting } = await loadJiraModule();
+        adoptLegacyMissingTicketHintsSetting();
+
+        await vi.waitFor(() => expect(mocks.addNotification).toHaveBeenCalled());
+        expect(window.localStorage.getItem(LEGACY_KEY)).toBe('true');
+    });
+
+    it('sends nothing for a stored value that matches the default anyway', async () => {
+        window.localStorage.setItem(LEGACY_KEY, 'false');
+
+        const { showMissingTicketHintsSetting, adoptLegacyMissingTicketHintsSetting } =
+            await loadJiraModule();
+        adoptLegacyMissingTicketHintsSetting();
+
+        expect(showMissingTicketHintsSetting.value).toBe(false);
+        expect(mocks.updateUser).not.toHaveBeenCalled();
+        // Spent, so it stops shadowing the account on the next load
+        expect(window.localStorage.getItem(LEGACY_KEY)).toBeNull();
+    });
+
+    /*
+     * The inverse of the bug this setting was moved to the server to fix: a device still holding
+     * the old `false` must not hide dots that another device has since switched on.
+     */
+    it('lets the account win over a stale stored false', async () => {
+        window.localStorage.setItem(LEGACY_KEY, 'false');
+        mocks.sharedUser = { id: 'user-1', show_missing_ticket_hints: true };
+
+        const { showMissingTicketHintsSetting } = await loadJiraModule();
+
+        expect(showMissingTicketHintsSetting.value).toBe(true);
+    });
+});
 
 describe('toExternalSyncBadges', () => {
     it('maps the states that only the server can know', () => {

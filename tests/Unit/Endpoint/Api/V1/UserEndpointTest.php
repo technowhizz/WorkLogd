@@ -47,6 +47,7 @@ class UserEndpointTest extends ApiEndpointTestAbstract
                 'week_start' => $data->user->week_start->value,
                 'calendar_week_days' => $data->user->calendar_week_days,
                 'no_project_color' => $data->user->no_project_color,
+                'show_missing_ticket_hints' => $data->user->show_missing_ticket_hints,
             ],
         ]);
     }
@@ -169,6 +170,61 @@ class UserEndpointTest extends ApiEndpointTestAbstract
         $this->assertSame('#ff7043', $user->no_project_color);
     }
 
+    public function test_update_changes_show_missing_ticket_hints(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'show_missing_ticket_hints' => true,
+        ]);
+
+        // Assert
+        $response->assertSuccessful();
+        $response->assertJson([
+            'data' => [
+                'show_missing_ticket_hints' => true,
+            ],
+        ]);
+        $this->assertTrue($data->user->fresh()->show_missing_ticket_hints);
+    }
+
+    public function test_update_switches_show_missing_ticket_hints_back_off(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        $data->user->show_missing_ticket_hints = true;
+        $data->user->save();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'show_missing_ticket_hints' => false,
+        ]);
+
+        // Assert
+        $response->assertSuccessful();
+        $this->assertFalse($data->user->fresh()->show_missing_ticket_hints);
+    }
+
+    public function test_update_fails_if_show_missing_ticket_hints_is_not_a_boolean(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'show_missing_ticket_hints' => 'maybe',
+        ]);
+
+        // Assert
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['show_missing_ticket_hints']);
+    }
+
     public function test_update_changes_no_project_color_to_a_color_with_alpha_channel(): void
     {
         // Arrange
@@ -242,6 +298,7 @@ class UserEndpointTest extends ApiEndpointTestAbstract
         $data->user->week_start = Weekday::Monday;
         $data->user->calendar_week_days = 4;
         $data->user->no_project_color = '#26a69a';
+        $data->user->show_missing_ticket_hints = true;
         $data->user->save();
         Passport::actingAs($data->user);
 
@@ -267,6 +324,7 @@ class UserEndpointTest extends ApiEndpointTestAbstract
         $this->assertSame(Weekday::Monday, $user->week_start);
         $this->assertSame(4, $user->calendar_week_days);
         $this->assertSame('#26a69a', $user->no_project_color);
+        $this->assertTrue($user->show_missing_ticket_hints);
     }
 
     public function test_update_email_stores_pending_email_and_sends_verification_email(): void

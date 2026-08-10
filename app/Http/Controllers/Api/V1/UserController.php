@@ -132,6 +132,10 @@ class UserController extends Controller
             $user->no_project_color = $request->getNoProjectColor();
         }
 
+        if ($request->getShowMissingTicketHints() !== null) {
+            $user->show_missing_ticket_hints = $request->getShowMissingTicketHints();
+        }
+
         $user->save();
 
         if ($emailToVerify !== null) {

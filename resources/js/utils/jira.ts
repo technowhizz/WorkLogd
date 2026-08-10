@@ -1,7 +1,9 @@
+import { computed, ref } from 'vue';
 import { usePage } from '@inertiajs/vue3';
-import { useStorage } from '@vueuse/core';
-import type { JiraSyncEntryStatus } from '@/packages/api/src';
+import { api, type JiraSyncEntryStatus } from '@/packages/api/src';
 import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
+import { getCurrentUserId } from '@/utils/useUser';
+import { useNotificationsStore } from '@/utils/notification';
 import type {
     ExternalSyncBadge,
     ExternalSyncBadges,
@@ -20,16 +22,142 @@ export function isJiraEnabled(): boolean {
 }
 
 /**
+ * The Inertia shared props carry the persisted value, the same way `week_start`, `timezone`,
+ * `calendar_week_days` and `no_project_color` do. Created at module scope like utils/useUser.ts:
+ * `usePage()` only wraps the adapter's page ref in computeds, so it is safe to call before the
+ * app is mounted as long as nothing reads `props` until then.
+ */
+const page = usePage<{
+    auth: {
+        // Optional because a session whose shared props predate this deploy has no such key
+        user: { show_missing_ticket_hints?: boolean };
+    };
+}>();
+
+const LEGACY_STORAGE_KEY = 'solidtime:jira-missing-ticket-hints';
+
+/**
+ * Reads the value this setting used to be kept in, so nobody who had already turned the dots on
+ * loses them. Read at import time because it needs nothing but localStorage; the push to the
+ * server happens later, from adoptLegacyMissingTicketHintsSetting().
+ *
+ * Deliberately does NOT remove the key - that only happens once the account has the value (see
+ * clearLegacyLocalStorageSetting). Dropping it here would lose the setting for good if the
+ * request that carries it to the server then failed.
+ */
+function readLegacyLocalStorageSetting(): boolean | null {
+    try {
+        const stored = window?.localStorage?.getItem(LEGACY_STORAGE_KEY);
+        if (stored === null || stored === undefined) {
+            return null;
+        }
+        return stored === 'true';
+    } catch {
+        // Private browsing modes and blocked storage both throw rather than returning null
+        return null;
+    }
+}
+
+function clearLegacyLocalStorageSetting(): void {
+    try {
+        window?.localStorage?.removeItem(LEGACY_STORAGE_KEY);
+    } catch {
+        // Nothing to do - a storage that will not delete will not have been read either
+    }
+}
+
+const legacyValue = readLegacyLocalStorageSetting();
+
+/**
+ * What this tab believes the value to be, or null to defer to the shared props.
+ *
+ * Kept because Inertia restores shared props from `history.state` on back/forward without asking
+ * the server, so a page that was open when the setting changed would otherwise flip back to the
+ * old value. The same caveat applies to `no_project_color` and friends - see
+ * packages/ui/src/utils/settings.ts - but those have no in-app control, and this one does.
+ */
+/*
+ * Only an enabled legacy value seeds this. A leftover `false` must defer to the account instead,
+ * or a device that still had the old key would hide the dots even though another device had
+ * since switched them on - the very bug this setting moved to the server to fix.
+ */
+const localValue = ref<boolean | null>(legacyValue === true ? true : null);
+
+async function persist(value: boolean): Promise<boolean> {
+    const previous = localValue.value;
+    localValue.value = value;
+
+    try {
+        await api.updateUser(
+            { show_missing_ticket_hints: value },
+            { params: { user: getCurrentUserId() } }
+        );
+        return true;
+    } catch {
+        localValue.value = previous;
+        useNotificationsStore().addNotification(
+            'error',
+            'Failed to save setting',
+            'Please try again later.'
+        );
+        return false;
+    }
+}
+
+/**
  * Whether to mark work entries that carry no Jira issue key. Off by default: on a board where
  * only some work is ticketed it is noise, and it is only useful to the people who want it.
  *
- * Shared by the calendar, the time list and the timesheet, so the setting follows you between
- * them. Same approach as utils/timeEntryGrouping.ts.
+ * A per-user setting on the server rather than localStorage, because it used to be the latter and
+ * signing in on a second device silently turned the dots back off. Shared by the calendar, the
+ * time list and the timesheet, so it follows you between them as well as between devices.
+ *
+ * Writing to it saves optimistically and reverts if the request fails.
  */
-export const showMissingTicketHintsSetting = useStorage<boolean>(
-    'solidtime:jira-missing-ticket-hints',
-    false
-);
+export const showMissingTicketHintsSetting = computed<boolean>({
+    get() {
+        if (localValue.value !== null) {
+            return localValue.value;
+        }
+        return page.props?.auth?.user?.show_missing_ticket_hints === true;
+    },
+    set(value) {
+        void persist(value);
+    },
+});
+
+// The layout that calls the function below mounts once per Inertia visit, and this module
+// outlives them all, so the one-shot guard has to live out here
+let legacyAdopted = false;
+
+/**
+ * Moves a value left over in localStorage onto the account, once, after the app has mounted -
+ * persisting needs the current user id, which comes from the shared props.
+ *
+ * Only an enabled setting is worth sending: the server already defaults to off, so pushing a
+ * stored `false` would be a request that changes nothing.
+ */
+export function adoptLegacyMissingTicketHintsSetting(): void {
+    if (legacyValue === null || legacyAdopted) {
+        return;
+    }
+    legacyAdopted = true;
+
+    // A stored `false` is what the server already defaults to, so there is nothing to send -
+    // but the key has still served its purpose and should stop shadowing the account.
+    if (legacyValue === false || page.props?.auth?.user?.show_missing_ticket_hints === true) {
+        clearLegacyLocalStorageSetting();
+        return;
+    }
+
+    // Only once the account actually holds the value, so a failed request leaves the key in
+    // place for the next page load to retry instead of silently dropping the setting.
+    void persist(true).then((saved) => {
+        if (saved) {
+            clearLegacyLocalStorageSetting();
+        }
+    });
+}
 
 const STATE_LABELS: Record<string, string> = {
     synced: 'Logged in Jira',

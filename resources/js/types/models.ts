@@ -95,6 +95,7 @@ export interface User {
     week_start: string;
     calendar_week_days: number;
     no_project_color: string;
+    show_missing_ticket_hints: boolean;
     // mutators
     profile_photo_url: string;
     // relations

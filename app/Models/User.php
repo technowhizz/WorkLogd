@@ -45,6 +45,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property Weekday $week_start
  * @property int $calendar_week_days
  * @property string $no_project_color
+ * @property bool $show_missing_ticket_hints
  * @property string|null $profile_photo_path
  * @property-read Organization|null $currentOrganization
  * @property-read GoogleCalendarConnection|null $googleCalendarConnection
@@ -116,6 +117,7 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, M
         'week_start' => Weekday::class,
         'calendar_week_days' => 'integer',
         'no_project_color' => 'string',
+        'show_missing_ticket_hints' => 'boolean',
     ];
 
     /**
@@ -127,6 +129,7 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, M
         'week_start' => Weekday::Monday,
         'calendar_week_days' => 7,
         'no_project_color' => '#6b7280',
+        'show_missing_ticket_hints' => false,
     ];
 
     /**

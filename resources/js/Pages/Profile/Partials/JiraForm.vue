@@ -107,7 +107,10 @@ async function disconnectJira() {
             </div>
 
             <div v-else class="space-y-5">
-                <div v-if="isConnected" class="flex items-center justify-between gap-3">
+                <div
+                    v-if="isConnected"
+                    class="flex items-center justify-between gap-3"
+                    data-testid="jira_connected_account">
                     <div class="break-all text-text-primary">
                         <div>{{ connection?.display_name ?? connection?.email }}</div>
                         <div class="text-sm text-text-tertiary mt-0.5">
@@ -170,7 +173,7 @@ async function disconnectJira() {
                         Marks work entries whose description contains no ticket key with a red dot,
                         in the calendar, the time list and the timesheet, so they are easy to spot.
                         Applies to every entry, and works whether or not you have connected your
-                        Jira account.
+                        Jira account. Saved to your account, so it follows you between devices.
                     </p>
                     <label class="flex items-center gap-2 pt-1 text-sm text-text-primary">
                         <Checkbox
@@ -224,12 +227,17 @@ async function disconnectJira() {
         </template>
 
         <template #footer>
-            <SecondaryButton @click="confirmingDisconnect = false"> Cancel </SecondaryButton>
+            <SecondaryButton
+                data-testid="jira_disconnect_cancel"
+                @click="confirmingDisconnect = false">
+                Cancel
+            </SecondaryButton>
 
             <DangerButton
                 class="ms-3"
                 :class="{ 'opacity-25': isDisconnecting }"
                 :disabled="isDisconnecting"
+                data-testid="jira_disconnect_confirm"
                 @click="disconnectJira">
                 Disconnect
             </DangerButton>
