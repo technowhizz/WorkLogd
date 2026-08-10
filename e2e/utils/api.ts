@@ -740,6 +740,39 @@ export async function createTimeEntryAtHourViaApi(
 }
 
 /**
+ * Creates a time entry that renders at a fixed hour in the *user's* timezone.
+ *
+ * Test users are registered with the timezone the browser reports, which is the
+ * runner's timezone. `createTimeEntryAtHourViaApi` pins the UTC hour, so the hour
+ * the UI displays shifts with the runner's offset. Use this helper instead when a
+ * test types an absolute time into the UI and needs it to stay on a known side of
+ * the entry's start/end — the displayed hour is then the same everywhere.
+ *
+ * Defaults to yesterday so the entry is always in the past, no matter what time of
+ * day the suite runs.
+ */
+export async function createTimeEntryAtLocalHourViaApi(
+    ctx: TestContext,
+    data: {
+        startHour: number;
+        durationSeconds: number;
+        date?: Date;
+        startMinute?: number;
+        description?: string;
+    }
+) {
+    const start = data.date ? new Date(data.date) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+    start.setHours(data.startHour, data.startMinute ?? 0, 0, 0);
+    const end = new Date(start.getTime() + data.durationSeconds * 1000);
+
+    return createTimeEntryWithTimestampsViaApi(ctx, {
+        start: formatTimestamp(start),
+        end: formatTimestamp(end),
+        description: data.description ?? '',
+    });
+}
+
+/**
  * Reads time entries for the current member, optionally filtered to a
  * date range. Returns the raw API objects (id, start, end, project_id,
  * etc.) so tests can assert on the database state after a UI action.
