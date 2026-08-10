@@ -14,6 +14,7 @@ import {
 } from 'echarts/components';
 import type { AggregatedTimeEntries, Organization } from '@/packages/api/src';
 import { useCssVariable } from '@/packages/ui/src';
+import { calendarDateForBucket } from '@/utils/calendarLink';
 
 use([CanvasRenderer, BarChart, TitleComponent, GridComponent, TooltipComponent, LegendComponent]);
 
@@ -23,10 +24,44 @@ const organization = inject<ComputedRef<Organization>>('organization');
 const chart = shallowRef(null);
 type GroupedData = AggregatedTimeEntries['grouped_data'];
 
-const props = defineProps<{
-    groupedData: GroupedData;
-    groupedType: string | null;
+const props = withDefaults(
+    defineProps<{
+        groupedData: GroupedData;
+        groupedType: string | null;
+        /**
+         * Off by default so the public shared report stays inert: /calendar is behind auth, and
+         * sending an unauthenticated reader there would swap the report they are reading for a
+         * login screen. Any future mount site is safe until it opts in.
+         */
+        clickable?: boolean;
+    }>(),
+    { clickable: false }
+);
+
+const emit = defineEmits<{
+    (e: 'bucket-click', date: string): void;
 }>();
+
+/**
+ * Resolves a clicked bar to the day the calendar should open on and hands it to the page,
+ * which owns the navigation — this component is mounted on a page that has no calendar to go
+ * to, so it reports the intent rather than acting on it.
+ *
+ * Only the drawn bar is a hit target. Gap-filled buckets have no height and so cannot be
+ * clicked; that is deliberate, and making the whole column band clickable would mean resolving
+ * the category from the pixel position instead.
+ */
+function onBarClick(params: { componentType: string; dataIndex: number }) {
+    if (!props.clickable || params.componentType !== 'series') return;
+
+    const date = calendarDateForBucket(
+        props.groupedData?.[params.dataIndex]?.key,
+        props.groupedType
+    );
+    if (date) {
+        emit('bucket-click', date);
+    }
+}
 
 const xAxisLabels = computed(() => {
     if (props.groupedType === 'week') {
@@ -135,6 +170,9 @@ const option = computed(() => ({
         {
             data: seriesData.value,
             type: 'bar',
+            // Only over the bar itself, which is exactly the clickable area — echarts hands the
+            // cursor to zrender per element, so blank canvas keeps the default arrow.
+            cursor: props.clickable ? 'pointer' : 'default',
             tooltip: {
                 valueFormatter: (value: number) => {
                     return formatReportingDuration(
@@ -154,9 +192,11 @@ const option = computed(() => ({
         <v-chart
             v-if="groupedData && groupedData?.length > 0"
             ref="chart"
+            data-testid="reporting_chart"
             :autoresize="true"
             class="chart"
-            :option="option" />
+            :option="option"
+            @click="onBarClick" />
         <div v-else class="chart flex flex-col items-center justify-center">
             <p class="text-lg text-text-primary font-semibold">No time entries found</p>
             <p>Try to change the filters and time range</p>

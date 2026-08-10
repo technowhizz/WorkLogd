@@ -51,6 +51,8 @@ import { getNoProjectColor } from '@/packages/ui/src/utils/settings';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import { useAggregatedTimeEntriesQuery } from '@/utils/useAggregatedTimeEntriesQuery';
 import type { TagMatchType } from '@/types/reporting';
+import { router } from '@inertiajs/vue3';
+import { calendarHref } from '@/utils/calendarLink';
 
 type TimeEntryRoundingType = 'up' | 'down' | 'nearest';
 
@@ -163,6 +165,18 @@ const aggregatedGraphTimeEntries = computed<AggregatedTimeEntries | undefined>((
 const aggregatedTableTimeEntries = computed<AggregatedTimeEntries | undefined>(() => {
     return tableResponse.value?.data as AggregatedTimeEntries | undefined;
 });
+
+/**
+ * Follows a clicked bar into the week it covers. A plain visit is what makes this work: the
+ * calendar reads `?date=` once during setup, so preserving state would remount nothing and the
+ * date would be ignored.
+ *
+ * The report's filters do not travel — the calendar has none — so this is "show me that week",
+ * not a filtered drill-down.
+ */
+function goToCalendarWeek(date: string) {
+    router.visit(calendarHref(date));
+}
 
 const reportProperties = computed(() => {
     const { billable: billableFilter, type: typeFilter, ...rest } = filterParams.value;
@@ -390,8 +404,10 @@ const tableData = computed(() => {
     <MainContainer>
         <div class="pt-10 w-full px-3 relative">
             <ReportingChart
+                clickable
                 :grouped-type="aggregatedGraphTimeEntries?.grouped_type ?? null"
-                :grouped-data="aggregatedGraphTimeEntries?.grouped_data ?? null"></ReportingChart>
+                :grouped-data="aggregatedGraphTimeEntries?.grouped_data ?? null"
+                @bucket-click="goToCalendarWeek"></ReportingChart>
         </div>
     </MainContainer>
     <MainContainer>

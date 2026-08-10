@@ -24,6 +24,8 @@ import { getOrganizationCurrencyString } from '@/utils/money';
 import { useQuery } from '@tanstack/vue-query';
 import { getCurrentOrganizationId } from '@/utils/useUser';
 import { api, type Organization } from '@/packages/api/src';
+import { router } from '@inertiajs/vue3';
+import { calendarHref } from '@/utils/calendarLink';
 
 use([CanvasRenderer, BarChart, TitleComponent, GridComponent, TooltipComponent, LegendComponent]);
 
@@ -177,6 +179,22 @@ const seriesData = computed(() => {
 
 const markLineColor = useCssVariable('--color-border-secondary');
 const labelColor = useCssVariable('--color-text-secondary');
+
+/**
+ * Opens the calendar on the clicked day. The x-axis labels are static weekday names, but the
+ * fetched rows carry the real dates in the same order, so the bar index is the lookup.
+ *
+ * These bars are always the current week, so this lands on the week you can already see — the
+ * point is that the bar stops being a dead end, and it lands on that day's column.
+ */
+function onBarClick(params: { componentType: string; dataIndex: number }) {
+    if (params.componentType !== 'series') return;
+
+    const date = weeklyHistory.value?.[params.dataIndex]?.date;
+    if (date) {
+        router.visit(calendarHref(date));
+    }
+}
 const option = computed(() => {
     return {
         tooltip: {
@@ -221,6 +239,7 @@ const option = computed(() => {
             {
                 data: seriesData.value,
                 type: 'bar',
+                cursor: 'pointer',
                 tooltip: {
                     valueFormatter: (value: number) => {
                         return formatReportingDuration(
@@ -241,7 +260,13 @@ const option = computed(() => {
         class="grid space-y-5 sm:space-y-0 sm:gap-x-6 xl:gap-x-6 grid-cols-1 lg:grid-cols-3 xl:grid-cols-4">
         <div class="col-span-2 xl:col-span-3">
             <CardTitle title="This Week" class="pb-8" :icon="ClockIcon"></CardTitle>
-            <v-chart v-if="weeklyHistory" :autoresize="true" class="chart" :option="option" />
+            <v-chart
+                v-if="weeklyHistory"
+                data-testid="this_week_chart"
+                :autoresize="true"
+                class="chart"
+                :option="option"
+                @click="onBarClick" />
 
             <div class="mt-6">
                 <ThisWeekReportingTable></ThisWeekReportingTable>

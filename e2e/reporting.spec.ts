@@ -7,6 +7,7 @@ import {
     createClientViaApi,
     createTaskViaApi,
     createTimeEntryViaApi,
+    createTimeEntryOnDateViaApi,
     createTimeEntryWithTagViaApi,
     createTimeEntryWithBillableStatusViaApi,
     createBareTimeEntryViaApi,
@@ -1039,4 +1040,62 @@ test('test that reporting has a type filter that can show only breaks', async ({
         ),
         page.getByRole('option', { name: 'Breaks' }).click(),
     ]);
+});
+
+test('test that clicking a bar on the reporting chart opens the calendar on that week', async ({
+    page,
+    ctx,
+}) => {
+    /*
+     * The chart is a canvas, so the click lands at a pixel rather than on an element, and only
+     * drawn bars are clickable. Filling every day of the default 14-day range makes the target
+     * unambiguous: every bar is present and the same height.
+     */
+    const today = new Date();
+    for (let daysAgo = 0; daysAgo <= 14; daysAgo++) {
+        const date = new Date(today);
+        date.setUTCDate(date.getUTCDate() - daysAgo);
+        await createTimeEntryOnDateViaApi(ctx, { date, duration: '1h' });
+    }
+
+    const aggregate = page.waitForResponse(
+        (response) =>
+            response.url().includes('/time-entries/aggregate') && response.status() === 200
+    );
+    await goToReporting(page);
+    const buckets = (await (await aggregate).json()).data.grouped_data as { key: string }[];
+
+    const chart = page.getByTestId('reporting_chart');
+    await expect(chart).toBeVisible();
+
+    /*
+     * Aim at a band centre derived from the bucket count rather than at the middle of the chart:
+     * with an even number of buckets the chart's centre is the gap *between* two bars, and the
+     * click silently hits nothing.
+     */
+    const index = Math.floor(buckets.length / 2);
+    const expectedDate = buckets[index]!.key;
+
+    /*
+     * The element is visible as soon as it is mounted, but echarts paints the bars a frame or
+     * two later, and a click on the not-yet-drawn canvas hits nothing. Retrying the click is
+     * what makes this stable — waiting a fixed time would either flake or be slow.
+     */
+    await expect(async () => {
+        const box = (await chart.boundingBox())!;
+        await chart.click({
+            position: {
+                x: (box.width * (index + 0.5)) / buckets.length,
+                // Below the bar tops, above the 50px x-label strip at the foot of the 300px chart.
+                y: box.height * 0.6,
+            },
+        });
+        await expect(page).toHaveURL(`${PLAYWRIGHT_BASE_URL}/calendar?date=${expectedDate}`, {
+            timeout: 1000,
+        });
+    }).toPass({ timeout: 15000 });
+
+    // The deep link is what this feature delegates to, so check it actually landed on that week.
+    await expect(page.locator('.fc')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator(`.fc-col-header-cell[data-date="${expectedDate}"]`)).toHaveCount(1);
 });
