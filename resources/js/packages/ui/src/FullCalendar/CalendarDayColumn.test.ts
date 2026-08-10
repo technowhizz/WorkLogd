@@ -176,19 +176,53 @@ describe('CalendarDayColumn resize grips', () => {
         expect(wrapper.get('.fc-event-resizer-end').attributes('style')).toContain('height: 12px');
     });
 
-    it('shrinks both grips once the full pair would leave too little to click', () => {
-        // 30px - two 12px grips (10px of each inside the block) leaves 10px; two 6px ones leave 22.
+    it('moves the grips out once the pair would leave too little to click', () => {
+        // 30px, less the 10px each 12px grip would eat, leaves 10px - under the 16px a click needs.
         const wrapper = gripColumn(30);
 
-        expect(wrapper.get('.fc-event-resizer-start').attributes('style')).toContain('height: 6px');
-        expect(wrapper.get('.fc-event-resizer-end').attributes('style')).toContain('height: 6px');
+        expect(wrapper.get('.fc-event-resizer-start').attributes('style')).toContain('top: -8px');
+        expect(wrapper.get('.fc-event-resizer-end').attributes('style')).toContain('bottom: -8px');
     });
 
-    it('drops the grips entirely on a block too short to carry even the small ones', () => {
-        // A 15-minute entry is this tall at ~50px/hour, and only 4px at the minimum zoom.
+    it('hangs the grips outside a block too short to host them', () => {
+        // A 15-minute entry is this tall at ~50px/hour, and only 4px at the minimum zoom. Rather
+        // than dropping the grips - which left no way to resize it at all - they move clear of the
+        // block, so every pixel of it stays clickable.
         const wrapper = gripColumn(12);
 
-        expect(wrapper.find('.fc-event-resizer').exists()).toBe(false);
+        const start = wrapper.get('.fc-event-resizer-start').attributes('style');
+        const end = wrapper.get('.fc-event-resizer-end').attributes('style');
+        expect(start).toContain('height: 8px');
+        expect(start).toContain('top: -8px');
+        expect(end).toContain('height: 8px');
+        expect(end).toContain('bottom: -8px');
+    });
+
+    it('keeps an outside grip off the corners and inert until the block is hovered', () => {
+        // An invisible strip hit-tests like any other, so one hanging over the next entry or an
+        // empty slot would take clicks meant for them.
+        const wrapper = gripColumn(12);
+        const classes = wrapper.get('.fc-event-resizer-end').classes();
+
+        expect(classes).toContain('w-1/2');
+        expect(classes).toContain('pointer-events-none');
+        expect(classes).toContain('group-hover:pointer-events-auto');
+    });
+
+    it('leaves the grips of a roomy block full width and always grabbable', () => {
+        const classes = gripColumn(50).get('.fc-event-resizer-end').classes();
+
+        expect(classes).toContain('w-full');
+        expect(classes).not.toContain('pointer-events-none');
+    });
+
+    it('still resizes from a grip that hangs outside the block', async () => {
+        const wrapper = gripColumn(12);
+
+        await wrapper.get('.fc-event-resizer-end').trigger('pointerdown');
+
+        expect(wrapper.emitted('resizer-pointerdown')).toHaveLength(1);
+        expect(wrapper.emitted('event-pointerdown')).toBeUndefined();
     });
 
     it('still opens the entry from a pointer-down anywhere on a block with no grips', async () => {
@@ -210,13 +244,16 @@ describe('CalendarDayColumn resize grips', () => {
     });
 
     it('counts only the grips a running entry actually shows', () => {
-        // No end grip on a running entry, so 20px is enough for a small start one.
+        // A running entry has no end to move, so its lone start grip costs 10px rather than 20 -
+        // and 20px less 10 still clears the 16px a click needs, so it stays inside the block.
         const wrapper = mountColumn({
-            dayEvents: [dayEvent({ height: 20 }, { isRunning: true })],
+            dayEvents: [dayEvent({ height: 30 }, { isRunning: true })],
         });
 
         expect(wrapper.find('.fc-event-resizer-end').exists()).toBe(false);
-        expect(wrapper.get('.fc-event-resizer-start').attributes('style')).toContain('height: 6px');
+        const start = wrapper.get('.fc-event-resizer-start').attributes('style');
+        expect(start).toContain('height: 12px');
+        expect(start).toContain('top: -2px');
     });
 });
 

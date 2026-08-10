@@ -1286,6 +1286,57 @@ test.describe('Resize Events', () => {
         expect(Math.abs(startDate.getTime() - origStart.getTime())).toBeLessThan(60000);
     });
 
+    test('a short entry can be resized and still opens on a click', async ({ page, ctx }) => {
+        // 15 minutes is 25px at the default zoom, which is too short to host a grip inside without
+        // crowding out the click - so the grips hang outside it. Both have to work.
+        const start = todayAt(10);
+        const end = new Date(new Date(start).getTime() + 15 * 60 * 1000).toISOString();
+        await createTimeEntryWithTimestampsViaApi(ctx, {
+            description: 'Short resize test',
+            start,
+            end: end.replace(/\.\d{3}Z$/, 'Z'),
+        });
+        await goToCalendar(page);
+        const event = page.locator('.fc-event').filter({ hasText: 'Short resize test' }).first();
+        await expect(event).toBeVisible();
+        await scrollIntoViewCentred(event);
+
+        const box = (await event.boundingBox())!;
+        const centreX = box.x + box.width / 2;
+        const gripY = box.y + box.height + 4;
+
+        const [putResponse] = await Promise.all([
+            page.waitForResponse(
+                (r) =>
+                    r.url().includes('/time-entries/') &&
+                    r.request().method() === 'PUT' &&
+                    r.status() === 200
+            ),
+            (async () => {
+                // Hovering the block is what arms the outside grip, so approach through it
+                await page.mouse.move(centreX, box.y + box.height / 2);
+                await page.waitForTimeout(150);
+                await page.mouse.move(centreX, gripY);
+                await page.waitForTimeout(120);
+                await page.mouse.down();
+                await page.mouse.move(centreX, gripY + 100, { steps: 15 });
+                await page.mouse.up();
+            })(),
+        ]);
+
+        const body = (await putResponse.json()).data;
+        const minutes =
+            (new Date(body.end).getTime() - new Date(body.start).getTime()) / (60 * 1000);
+        expect(minutes).toBeGreaterThan(15);
+
+        // And the click that opens the entry is still the click, not a grab
+        await page.reload();
+        const resized = page.locator('.fc-event').filter({ hasText: 'Short resize test' }).first();
+        await scrollIntoViewCentred(resized);
+        await resized.click();
+        await expect(page.getByRole('dialog')).toBeVisible();
+    });
+
     test('running entry cannot be resized from bottom', async ({ page, ctx }) => {
         await createRunningTimeEntryViaApi(ctx, 'No bottom resize');
         await goToCalendar(page);

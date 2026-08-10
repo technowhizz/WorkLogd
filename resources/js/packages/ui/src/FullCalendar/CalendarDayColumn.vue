@@ -24,15 +24,26 @@ const COLUMN_GAP = '2px';
  * entry is 25px tall at the default zoom and 4px at the minimum, so a fully covered block was
  * the normal case rather than the edge case.
  *
- * Opening the entry therefore wins: it is the operation the grips are a shortcut *for* — the
- * dialog edits the same two timestamps as text — so the grips shrink, and then go, as the
- * block runs out of room. Below the last threshold you resize by zooming in, which restores
- * them, or by typing the times in the dialog the click now reliably opens.
+ * So a block with room hosts them inside, and any block without moves them *outside* instead: a
+ * strip above the top edge and below the bottom one. The block then keeps every pixel of itself
+ * for the click and stays resizable at any zoom.
+ *
+ * There used to be a middle tier of 6px grips inside the block, for the band too tight for the
+ * full pair. It is gone: 6px was a poor target, which is what made short entries feel
+ * unresizable, and an outside grip costs the block nothing, so there is no reason to trade the
+ * click area for a worse handle.
+ *
+ * Two things make the outside grips safe. They are narrower than the block, leaving its corners
+ * free, and they take pointer events only while the block is hovered — an invisible strip
+ * hit-tests just as well as a visible one, so without that they would quietly intercept clicks
+ * meant for the entry or the empty slot they hang over. Hovering a grip keeps the block hovered,
+ * since it is still a child of it, so reaching for one never switches it off mid-approach.
  */
 const RESIZER_HEIGHT = 12;
-const RESIZER_COMPACT_HEIGHT = 6;
 /** Each grip is offset 2px outside the block, so it only eats `height - 2` of it. */
 const RESIZER_OVERHANG = 2;
+/** A grip that has been pushed clear of the block, so none of it eats the block's own height. */
+const RESIZER_OUTSIDE_HEIGHT = 8;
 /**
  * Height that must stay clear of every grip for the block to be clickable. Same 16px the
  * activity boxes ask for before they draw anything into themselves.
@@ -174,14 +185,40 @@ function resizerHeight(dayEvent: DayEvent): number {
     const grips = (hasStartResizer(dayEvent) ? 1 : 0) + (hasEndResizer(dayEvent) ? 1 : 0);
     if (grips === 0) return 0;
 
-    const clickableHeight = (gripHeight: number) =>
-        dayEvent.height - grips * (gripHeight - RESIZER_OVERHANG);
+    const clickableHeight = dayEvent.height - grips * (RESIZER_HEIGHT - RESIZER_OVERHANG);
 
-    if (clickableHeight(RESIZER_HEIGHT) >= MIN_EVENT_CLICK_HEIGHT) return RESIZER_HEIGHT;
-    if (clickableHeight(RESIZER_COMPACT_HEIGHT) >= MIN_EVENT_CLICK_HEIGHT) {
-        return RESIZER_COMPACT_HEIGHT;
-    }
-    return 0;
+    return clickableHeight >= MIN_EVENT_CLICK_HEIGHT ? RESIZER_HEIGHT : 0;
+}
+
+/**
+ * Whether this block's grips have to hang outside it, which is the case exactly when it renders
+ * grips at all but has no room to host one without crowding out the click.
+ */
+function resizesFromOutside(dayEvent: DayEvent): boolean {
+    return resizerHeight(dayEvent) === 0 && (hasStartResizer(dayEvent) || hasEndResizer(dayEvent));
+}
+
+/** Grip height, whether it sits inside the block or clear of it. */
+function gripHeight(dayEvent: DayEvent): number {
+    return resizesFromOutside(dayEvent) ? RESIZER_OUTSIDE_HEIGHT : resizerHeight(dayEvent);
+}
+
+/**
+ * Where the grip's inner edge sits, as a `top`/`bottom` offset. Inside grips overlap the block by
+ * all but their 2px overhang; outside ones are pushed clear by their whole height.
+ */
+function gripOffset(dayEvent: DayEvent): string {
+    return resizesFromOutside(dayEvent) ? `-${RESIZER_OUTSIDE_HEIGHT}px` : `-${RESIZER_OVERHANG}px`;
+}
+
+/**
+ * Outside grips are kept narrower than the block and inert until it is hovered, so they cannot
+ * silently take clicks from the entry or empty slot they hang over.
+ */
+function gripClasses(dayEvent: DayEvent): string {
+    return resizesFromOutside(dayEvent)
+        ? 'left-1/4 w-1/2 pointer-events-none group-hover:pointer-events-auto'
+        : 'left-0 w-full';
 }
 
 function isUncoveredByEvents(abox: ActivityBox): boolean {
@@ -245,9 +282,13 @@ const emit = defineEmits<{
                             @pointerdown="emit('event-pointerdown', $event, dayEvent)"
                             @keydown.enter.prevent="emit('event-keydown-enter', dayEvent)">
                             <div
-                                v-if="hasStartResizer(dayEvent) && resizerHeight(dayEvent) > 0"
-                                class="fc-event-resizer fc-event-resizer-start absolute z-[99] w-full left-0 top-[-2px] cursor-row-resize flex items-center justify-center opacity-0 group-hover:opacity-100"
-                                :style="{ height: resizerHeight(dayEvent) + 'px' }"
+                                v-if="hasStartResizer(dayEvent) && gripHeight(dayEvent) > 0"
+                                class="fc-event-resizer fc-event-resizer-start absolute z-[99] cursor-row-resize flex items-center justify-center opacity-0 group-hover:opacity-100"
+                                :class="gripClasses(dayEvent)"
+                                :style="{
+                                    height: gripHeight(dayEvent) + 'px',
+                                    top: gripOffset(dayEvent),
+                                }"
                                 @pointerdown.stop.prevent="
                                     emit('resizer-pointerdown', $event, dayEvent, 'start')
                                 "></div>
@@ -263,9 +304,13 @@ const emit = defineEmits<{
                                     :duration-seconds="getEventDurationSeconds(dayEvent, dayStr)" />
                             </div>
                             <div
-                                v-if="hasEndResizer(dayEvent) && resizerHeight(dayEvent) > 0"
-                                class="fc-event-resizer fc-event-resizer-end absolute z-[99] w-full left-0 bottom-[-2px] cursor-row-resize flex items-center justify-center opacity-0 group-hover:opacity-100"
-                                :style="{ height: resizerHeight(dayEvent) + 'px' }"
+                                v-if="hasEndResizer(dayEvent) && gripHeight(dayEvent) > 0"
+                                class="fc-event-resizer fc-event-resizer-end absolute z-[99] cursor-row-resize flex items-center justify-center opacity-0 group-hover:opacity-100"
+                                :class="gripClasses(dayEvent)"
+                                :style="{
+                                    height: gripHeight(dayEvent) + 'px',
+                                    bottom: gripOffset(dayEvent),
+                                }"
                                 @pointerdown.stop.prevent="
                                     emit('resizer-pointerdown', $event, dayEvent, 'end')
                                 "></div>
