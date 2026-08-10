@@ -528,6 +528,9 @@ test('test that the sync dialog previews creates, updates, deletes, unchanged an
     // Deleting is the only thing here that destroys work in Jira, so it is called out on its own
     await expect(page.getByTestId('jira_sync_delete_warning')).toBeVisible();
     await expect(page.getByTestId('jira_sync_confirm')).toContainText('Sync 3 to Jira');
+    // 1h onto PROJ-4 plus PROJ-1 growing to 2h. The deleted hour is coming back out of Jira, so
+    // it is not part of what is being logged and must not be added on top.
+    await expect(page.getByTestId('jira_sync_total')).toHaveText('Total 3h 00min');
 
     // Act: carry it out
     await page.getByTestId('jira_sync_confirm').click();

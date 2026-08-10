@@ -20,6 +20,13 @@ const sync = vi.hoisted(() => ({
     state: null as unknown,
 }));
 
+// The delete warning names the app, which reads Inertia's page props - absent under mount().
+vi.mock('@/utils/appName', async () => {
+    const { computed } = await import('vue');
+
+    return { useAppName: () => computed(() => "WorkLog'd") };
+});
+
 vi.mock('@/utils/useJiraQuery', async () => {
     const { ref } = await import('vue');
 
@@ -49,26 +56,30 @@ function syncState(): SyncState {
     return sync.state as SyncState;
 }
 
-function planWithOneCreate(): JiraSyncPlan {
+/** One hour, created. Spread it to vary an item without repeating every field. */
+function createItem(): Record<string, unknown> {
     return {
-        items: [
-            {
-                action: 'create',
-                issue_key: 'PROJ-1',
-                work_date: '2026-08-10',
-                comment: 'a thing',
-                group_hash: 'hash-1',
-                duration: 3600,
-                previous_duration: null,
-                started: '2026-08-10T09:00:00.000+0000',
-                jira_worklog_id: null,
-                time_entry_ids: ['entry-1'],
-                status: null,
-                error: null,
-            },
-        ],
-        skipped: [],
-    } as unknown as JiraSyncPlan;
+        action: 'create',
+        issue_key: 'PROJ-1',
+        work_date: '2026-08-10',
+        comment: 'a thing',
+        group_hash: 'hash-1',
+        duration: 3600,
+        previous_duration: null,
+        started: '2026-08-10T09:00:00.000+0000',
+        jira_worklog_id: null,
+        time_entry_ids: ['entry-1'],
+        status: null,
+        error: null,
+    };
+}
+
+function planWithItems(items: Array<Record<string, unknown>>): JiraSyncPlan {
+    return { items, skipped: [] } as unknown as JiraSyncPlan;
+}
+
+function planWithOneCreate(): JiraSyncPlan {
+    return planWithItems([createItem()]);
 }
 
 function mountDialog(props: { show: boolean; startDate: string; endDate: string }) {
@@ -154,6 +165,54 @@ describe('JiraSyncDialog', () => {
         expect(wrapper.findComponent(LoadingSpinner).exists()).toBe(true);
         // The plan stays in the DOM, so nothing below it moves while the new one loads
         expect(wrapper.find('[data-testid="jira_sync_plan"]').exists()).toBe(true);
+    });
+
+    it('totals the time being logged next to the sync button', async () => {
+        const wrapper = mountDialog({
+            show: true,
+            startDate: '2026-08-10',
+            endDate: '2026-08-16',
+        });
+        syncState().plan.value = planWithOneCreate();
+        await nextTick();
+
+        expect(wrapper.find('[data-testid="jira_sync_total"]').text()).toBe('Total 1h 00min');
+    });
+
+    it('leaves deletions out of the total and counts the new size of an update', async () => {
+        const wrapper = mountDialog({
+            show: true,
+            startDate: '2026-08-10',
+            endDate: '2026-08-16',
+        });
+        // 1h create + 2h15m update (was 30m, so the previous size must not be what counts),
+        // and a 2h delete that must not be added on top
+        syncState().plan.value = planWithItems([
+            createItem(),
+            {
+                ...createItem(),
+                action: 'update',
+                group_hash: 'hash-2',
+                duration: 8100,
+                previous_duration: 1800,
+            },
+            { ...createItem(), action: 'delete', group_hash: 'hash-3', duration: 7200 },
+        ]);
+        await nextTick();
+
+        expect(wrapper.find('[data-testid="jira_sync_total"]').text()).toBe('Total 3h 15min');
+    });
+
+    it('shows no total when there is nothing to send', async () => {
+        const wrapper = mountDialog({
+            show: true,
+            startDate: '2026-08-10',
+            endDate: '2026-08-16',
+        });
+        syncState().plan.value = planWithItems([{ ...createItem(), action: 'unchanged' }]);
+        await nextTick();
+
+        expect(wrapper.find('[data-testid="jira_sync_total"]').exists()).toBe(false);
     });
 
     it('does not offer to sync while a plan is loading', async () => {

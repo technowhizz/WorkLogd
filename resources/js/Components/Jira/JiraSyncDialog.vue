@@ -122,6 +122,16 @@ const deletions = computed(() => items.value.filter((item) => item.action === 'd
 const deletedSeconds = computed(() =>
     deletions.value.reduce((total, item) => total + item.duration, 0)
 );
+/*
+ * What this sync will leave in Jira: creates, plus the new size of each update. Deletes are left
+ * out because they take time out rather than putting it in, and they already carry their own
+ * total in the warning above - adding them here would net two opposite things into one number.
+ */
+const syncedSeconds = computed(() =>
+    changes.value
+        .filter((item) => item.action !== 'delete')
+        .reduce((total, item) => total + item.duration, 0)
+);
 const skipped = computed(() => plan.value?.skipped ?? []);
 
 /** Only entries that could have been synced but were not - breaks and pre-cutoff work are noise here. */
@@ -408,7 +418,19 @@ function confirm() {
                 </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter class="sm:items-center">
+                <!--
+                    Next to the button that sends it, so the amount of time about to be logged is
+                    the last thing read before confirming rather than something to add up from the
+                    table. sm:mr-auto keeps it left of the buttons on a wide dialog.
+                -->
+                <p
+                    v-if="!run && changes.length > 0 && rangeError === null"
+                    class="pt-3 text-sm tabular-nums text-text-secondary sm:pt-0 sm:mr-auto"
+                    data-testid="jira_sync_total">
+                    Total
+                    <span class="font-medium text-text-primary">{{ duration(syncedSeconds) }}</span>
+                </p>
                 <SecondaryButton data-testid="jira_sync_close" @click="emit('close')">
                     {{ hasFinished ? 'Close' : 'Cancel' }}
                 </SecondaryButton>
