@@ -5,6 +5,7 @@ import { getDayJsInstance, getLocalizedDayJs, getLocalizedDayJsFromMinutes } fro
 import type { CalendarSettings } from './calendarSettings';
 import { minutesToPixelsFor } from './calendarSettings';
 import type { CalendarEvent, DayEvent } from './calendarTypes';
+import { DRAG_THRESHOLD } from './calendarTypes';
 import { createEscapeCancel } from './escapeCancel';
 
 function snapTo(value: number, step: number): number {
@@ -36,6 +37,11 @@ export function useEventResize(params: {
     let resizeOriginalTop = 0;
     let resizeOriginalHeight = 0;
     let resizeOriginalDayStr = '';
+    let resizeStartClientX = 0;
+    let resizeStartClientY = 0;
+    // Stays false until the pointer travels past DRAG_THRESHOLD, which is what
+    // separates a resize from a plain click on the 12px handle strip.
+    let hasResized = false;
 
     const escapeCancel = createEscapeCancel(() => cancelResize());
 
@@ -65,6 +71,7 @@ export function useEventResize(params: {
         resizeCurrentTop.value = resizeOriginalTop;
         resizeCurrentHeight.value = resizeOriginalHeight;
         resizeOriginalEvent = null;
+        hasResized = false;
         resetResizeState();
     }
 
@@ -156,8 +163,11 @@ export function useEventResize(params: {
         resizeEdge.value = edge;
         resizeOriginalTop = dayEvent.top;
         resizeOriginalHeight = dayEvent.height;
-        resizeEventId.value = ev.id;
-        isResizing.value = true;
+        resizeStartClientX = e.clientX;
+        resizeStartClientY = e.clientY;
+        hasResized = false;
+        // `isResizing`/`resizeEventId` stay unset until the threshold is passed, so a
+        // click that never becomes a resize shows no live preview or duration readout.
         resizeCurrentTop.value = dayEvent.top;
         resizeCurrentHeight.value = dayEvent.height;
         resizeOriginalDayStr = dayStr;
@@ -168,6 +178,17 @@ export function useEventResize(params: {
 
     function onResizePointerMove(e: PointerEvent) {
         if (!resizeOriginalEvent) return;
+
+        if (!hasResized) {
+            const dx = e.clientX - resizeStartClientX;
+            const dy = e.clientY - resizeStartClientY;
+            if (Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return;
+
+            hasResized = true;
+            isResizing.value = true;
+            resizeEventId.value = resizeOriginalEvent.id;
+        }
+
         const { s, snapPx, totalGridPx } = getGridConstants();
 
         const dayStr = params.getDayFromClientX(e.clientX);
@@ -315,6 +336,17 @@ export function useEventResize(params: {
     async function onResizePointerUp(e: PointerEvent) {
         removeResizeListeners();
 
+        // A press-and-release on the handle without movement is not a resize. Bail out
+        // before computing any times: `computeResizedTimes` snaps to the grid, so an
+        // off-grid entry (10:03–10:57) would otherwise be rewritten by a mere click.
+        if (!hasResized) {
+            isResizing.value = false;
+            resizeOriginalEvent = null;
+            resetResizeState();
+            return;
+        }
+        hasResized = false;
+
         const times = computeResizedTimes(e.clientY);
         isResizing.value = false;
 
@@ -350,6 +382,20 @@ export function useEventResize(params: {
 
         // Prevent start in the future for running entries
         if (updatedTimeEntry.end === null && d(updatedTimeEntry.start).isAfter(d())) {
+            resetResizeState();
+            return;
+        }
+
+        // Nothing to save if the gesture landed back on the times the entry already has.
+        // Compared as instants rather than strings, because the stored value and the one
+        // we build here can spell the same moment differently ("Z" vs "+00:00").
+        const isSameInstant = (a: string | null, b: string | null): boolean =>
+            a === null || b === null ? a === b : d(a).isSame(d(b));
+
+        if (
+            isSameInstant(updatedTimeEntry.start, timeEntry.start) &&
+            isSameInstant(updatedTimeEntry.end, timeEntry.end)
+        ) {
             resetResizeState();
             return;
         }
