@@ -17,6 +17,10 @@
 # exist in oauth_clients for the app to mint API tokens with them. The command to
 # create it is printed at the end and only needs running once, after the first boot.
 #
+# The other follow-up step is the first user. Self-hosted installs have no public
+# sign-up, so a fresh database has no accounts and nothing can log in until
+# `php artisan admin:user:create` has run. That command is printed at the end too.
+#
 # Do not regenerate this file for an existing installation:
 #   APP_KEY      decrypts every stored Jira and Google token - changing it orphans them.
 #   PASSPORT_*   keys sign every API token - changing them logs out every API client
@@ -37,7 +41,7 @@ while [ $# -gt 0 ]; do
             force=true
             ;;
         -h | --help)
-            sed -n '2,26p' "$0" | cut -c 3-
+            sed -n '2,30p' "$0" | cut -c 3-
             exit 0
             ;;
         -*)
@@ -180,4 +184,16 @@ Skip it and the app works, but "Create API token" in Profile Settings fails with
 
 Do not run 'php artisan db:seed' to create it. That seeder wipes every table first
 and replaces them with demo organizations - it is for development only.
+
+Finally, create the first user. There is no sign-up on a self-hosted install -
+APP_ENABLE_REGISTRATION is off in the example stack, so the database starts empty and
+nothing can log in until this has run:
+
+    docker compose -f docker-compose.prod.yml exec app \\
+        php artisan admin:user:create "Your Name" you@example.com --verify-email
+
+It prints a generated password, and creates the user's personal organization along
+with them. Use the address you put in SUPER_ADMINS and keep --verify-email: admin
+panel access needs the email both listed there and verified. Everyone after the first
+user joins by invitation, so registration can stay off.
 EOF

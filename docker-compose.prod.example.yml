@@ -6,8 +6,9 @@
 #   ./generate-secrets.sh          # writes worklogd.prod.env next to this file
 #   docker compose -f docker-compose.prod.yml up -d
 #
-# generate-secrets.sh prints one follow-up command to run after the first boot, which
-# creates the personal access client row the API token screen needs.
+# generate-secrets.sh prints two follow-up commands to run after the first boot: one creates
+# the personal access client row the API token screen needs, the other creates the first user.
+# There is no sign-up here and no setup wizard - see APP_ENABLE_REGISTRATION below.
 #
 # Every service reads worklogd.prod.env. postgres only needs POSTGRES_PASSWORD out of
 # it and ignores the rest.
@@ -26,7 +27,13 @@ x-app-env: &app-env
     # APP_KEY comes from worklogd.prod.env
     APP_URL: 'https://time.example.com'
     APP_FORCE_HTTPS: 'true'
+    # No public sign-up: /register 404s, so a fresh install has no accounts and no way to make
+    # one in the browser. Create the first from the app container once the stack is up, then
+    # invite everyone else - an invitation link opens sign-up for its own address only:
+    #   php artisan admin:user:create "Your Name" you@example.com --verify-email
     APP_ENABLE_REGISTRATION: 'false'
+    # Grants the admin panel, by email. The address must belong to a user whose email is
+    # verified, which is what --verify-email above is for.
     SUPER_ADMINS: 'you@example.com'
 
     # Postgres only. The app uses jsonb, partial unique indexes and date_bin().

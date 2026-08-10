@@ -90,7 +90,22 @@ cp docker-compose.prod.example.yml docker-compose.prod.yml
 ./generate-secrets.sh                        # writes worklogd.prod.env
 # edit docker-compose.prod.yml: APP_URL, SUPER_ADMINS and the mail settings
 docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml exec app \
+    php artisan admin:user:create "Your Name" you@example.com --verify-email
 ```
+
+**There is no setup wizard, and the first user has to be created from the command line.** The
+example stack ships with `APP_ENABLE_REGISTRATION=false`, which removes public sign-up entirely -
+`/register` returns 404 and the login screen offers no link to it - so a fresh database has no
+accounts and no way to make one through the browser. `admin:user:create` is the way in: it creates
+the user together with their personal organization and prints a generated password, or pass
+`--ask-for-password` to choose one. Use the address you put in `SUPER_ADMINS` and keep
+`--verify-email` - admin panel access needs the email both listed there and verified, and
+`admin:user:verify <email>` does the latter afterwards if you forget.
+
+Everyone after that joins by invitation, so registration can stay off. Someone invited to an
+organization still has to create an account before they can accept, so an invitation link opens the
+sign-up screen for the person holding it - and only for the address the invitation was sent to.
 
 `generate-secrets.sh` produces every value that is yours to invent - `APP_KEY`, the database
 password, the Passport signing keys and the personal access client credentials - and prints the one
