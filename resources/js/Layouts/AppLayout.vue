@@ -41,12 +41,16 @@ import { isBillingActivated, isInvoicingActivated } from '@/utils/billing';
 import type { User } from '@/types/models';
 import { ArrowsRightLeftIcon } from '@heroicons/vue/16/solid';
 import { fetchToken, isTokenValid } from '@/utils/session';
-import UpdateSidebarNotification from '@/Components/UpdateSidebarNotification.vue';
 import BillingBanner from '@/Components/Billing/BillingBanner.vue';
 import UserTimezoneMismatchModal from '@/Components/Common/User/UserTimezoneMismatchModal.vue';
 import { useTheme } from '@/utils/theme';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
-import { detectIssueKey, parseProjectKeys, showMissingTicketHintsSetting } from '@/utils/jira';
+import {
+    adoptLegacyMissingTicketHintsSetting,
+    detectIssueKey,
+    parseProjectKeys,
+    showMissingTicketHintsSetting,
+} from '@/utils/jira';
 import { useJiraConnectionQuery } from '@/utils/useJiraQuery';
 import {
     EXTERNAL_REFERENCE_DETECTOR,
@@ -127,6 +131,9 @@ provide(
 
 onMounted(async () => {
     useTheme();
+    // The missing-ticket dots used to be a localStorage flag. Anyone who had it switched on keeps
+    // it, on the account this time, so it now follows them to their other devices.
+    adoptLegacyMissingTicketHintsSetting();
     // make sure that the initial requests are only loaded once, this can be removed once we move away from inertia
     if (window.initialDataLoaded !== true) {
         window.initialDataLoaded = true;
@@ -333,7 +340,6 @@ const page = usePage<{
                     </nav>
                 </div>
                 <div class="justify-self-end">
-                    <UpdateSidebarNotification></UpdateSidebarNotification>
                     <ul
                         class="border-t border-default-background-separator pt-3 gap-1 flex justify-between items-center">
                         <UserSettingsIcon></UserSettingsIcon>
