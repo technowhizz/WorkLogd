@@ -453,6 +453,87 @@ test('test that updating the start date of a time entry via the edit modal works
     expect(getMonthFromTimestamp(updateBody.data.start)).toBe(expectedMonth);
 });
 
+test('test that changing the start date keeps the duration rather than collapsing the entry', async ({
+    page,
+    ctx,
+}) => {
+    // Arrange: a two hour entry, so a collapse to zero is unmistakable
+    await createBareTimeEntryViaApi(ctx, 'Date move keeps duration', '2h');
+    await goToTimeOverview(page);
+    const row = page.locator('[data-testid="time_entry_row"]').first();
+    await row.getByRole('button', { name: 'Actions for the time entry' }).first().click();
+    await page.getByTestId('time_entry_edit').click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    // Act: move it to the 15th of the previous month - a later date in the same month would be
+    // enough to reproduce, but going back also proves the end follows in both directions
+    await page
+        .getByRole('dialog')
+        .getByRole('button', { name: DATE_PICKER_BUTTON_PATTERN })
+        .first()
+        .click();
+    await page.getByRole('button', { name: /Previous/i }).click();
+    await page.getByRole('gridcell').filter({ hasText: /^15$/ }).first().click();
+
+    const [updateResponse] = await Promise.all([
+        page.waitForResponse(
+            (response) =>
+                response.url().includes('/time-entries') &&
+                response.request().method() === 'PUT' &&
+                response.status() === 200
+        ),
+        page.getByRole('button', { name: 'Update Time Entry' }).click(),
+    ]);
+
+    // Assert: moved to the 15th, and still two hours long. Without the end following the start
+    // this stretched to whatever the gap to the old end was - 26 days, in this case.
+    const updated = (await updateResponse.json()).data;
+    expect(getDayFromTimestamp(updated.start)).toBe(15);
+    const durationMs = new Date(updated.end).getTime() - new Date(updated.start).getTime();
+    expect(durationMs).toBe(2 * 60 * 60 * 1000);
+});
+
+test('test that moving the start date forward keeps the duration instead of zeroing it', async ({
+    page,
+    ctx,
+}) => {
+    // Arrange
+    // A separate test rather than a second act on the one above: once an entry has moved to
+    // another month it is no longer the row the helpers reach for.
+    await createBareTimeEntryViaApi(ctx, 'Date move forward', '2h');
+    await goToTimeOverview(page);
+    const row = page.locator('[data-testid="time_entry_row"]').first();
+    await row.getByRole('button', { name: 'Actions for the time entry' }).first().click();
+    await page.getByTestId('time_entry_edit').click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    // Act: forward, which is the direction that used to collapse the entry - the old end fell
+    // before the new start, and the anti-inversion guard pulled it up to meet it
+    await page
+        .getByRole('dialog')
+        .getByRole('button', { name: DATE_PICKER_BUTTON_PATTERN })
+        .first()
+        .click();
+    await page.getByRole('button', { name: /Next/i }).click();
+    await page.getByRole('gridcell').filter({ hasText: /^20$/ }).first().click();
+
+    const [updateResponse] = await Promise.all([
+        page.waitForResponse(
+            (response) =>
+                response.url().includes('/time-entries') &&
+                response.request().method() === 'PUT' &&
+                response.status() === 200
+        ),
+        page.getByRole('button', { name: 'Update Time Entry' }).click(),
+    ]);
+
+    // Assert
+    const updated = (await updateResponse.json()).data;
+    expect(getDayFromTimestamp(updated.start)).toBe(20);
+    const durationMs = new Date(updated.end).getTime() - new Date(updated.start).getTime();
+    expect(durationMs).toBe(2 * 60 * 60 * 1000);
+});
+
 test('test that setting a date in the create modal works', async ({ page }) => {
     await goToTimeOverview(page);
 

@@ -114,6 +114,36 @@ const localEnd = computed({
     },
 });
 
+/**
+ * The date picker *moves* the entry; the time pickers resize it.
+ *
+ * Putting the date through localStart instead resized it to nothing: a later date makes the old end
+ * earlier than the new start, and localStart's guard against an inverted entry then pulls the end
+ * up to meet the start. "This work happened on Tuesday, not Monday" has to keep its duration, so
+ * the end moves by exactly as much as the start does - which also carries an entry that runs past
+ * midnight along with its second day.
+ */
+const localStartDate = computed({
+    get: () => localStart.value,
+    set: (value: string) => {
+        const entry = editableTimeEntry.value;
+        if (!entry) {
+            return;
+        }
+
+        const nextStart = getLocalizedDayJs(value);
+        // A running entry has no end to carry
+        const durationMs = entry.end
+            ? getLocalizedDayJs(entry.end).diff(getLocalizedDayJs(entry.start))
+            : null;
+
+        entry.start = nextStart.utc().format();
+        if (durationMs !== null) {
+            entry.end = nextStart.add(durationMs, 'millisecond').utc().format();
+        }
+    },
+});
+
 async function submit() {
     if (editableTimeEntry.value) {
         saving.value = true;
@@ -327,7 +357,7 @@ const externalReference = computed(() =>
                                 v-model="localStart"
                                 class="w-full"></TimePickerSimple>
                             <DatePicker
-                                v-model="localStart"
+                                v-model="localStartDate"
                                 class="w-full"
                                 tabindex="1"></DatePicker>
                         </div>
