@@ -3,9 +3,9 @@
 # Generates every secret docker-compose.prod.example.yml needs, into an env file the
 # compose stack reads with `env_file:`.
 #
-#   ./generate-secrets.sh                    # writes ./solidtime.prod.env
+#   ./generate-secrets.sh                    # writes ./worklogd.prod.env
 #   ./generate-secrets.sh --force            # overwrite an existing file
-#   ./generate-secrets.sh /srv/solidtime.env # write somewhere else
+#   ./generate-secrets.sh /srv/worklogd.env # write somewhere else
 #
 # Everything here is generated locally with openssl - nothing needs the app, PHP, a
 # database or a running container. What it cannot generate is the credentials of other
@@ -26,7 +26,7 @@
 
 set -euo pipefail
 
-readonly OUTPUT_DEFAULT='solidtime.prod.env'
+readonly OUTPUT_DEFAULT='worklogd.prod.env'
 
 force=false
 output=''
@@ -172,7 +172,7 @@ PASSPORT_PERSONAL_ACCESS_CLIENT_ID refers to. Run this once, on first install; i
 idempotent, so a repeat is harmless:
 
     docker compose -f docker-compose.prod.yml exec -T pgsql \\
-        psql -v ON_ERROR_STOP=1 -U solidtime -d solidtime \\
+        psql -v ON_ERROR_STOP=1 -U worklogd -d worklogd \\
         -c "INSERT INTO oauth_clients (id, name, secret, provider, grant_types, redirect_uris, revoked, created_at, updated_at) VALUES ('${passport_client_id}', 'API', '${passport_client_secret}', 'users', '[\\"personal_access\\"]', '[]', false, now(), now()) ON CONFLICT (id) DO NOTHING;"
 
 Skip it and the app works, but "Create API token" in Profile Settings fails with

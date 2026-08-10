@@ -17,7 +17,7 @@ tests
 
 docker-compose.yml
 docker-compose.prod.yml
-solidtime.prod.env
+worklogd.prod.env
 docker/local
 
 .phpunit.cache

@@ -12,7 +12,7 @@ dist
 /vendor
 .env
 .env.backup
-/solidtime.prod.env
+/worklogd.prod.env
 /docker-compose.prod.yml
 .phpunit.result.cache
 Homestead.json

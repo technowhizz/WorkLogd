@@ -87,7 +87,7 @@ This fork ships its own example stack, built around the images published to
 
 ```bash
 cp docker-compose.prod.example.yml docker-compose.prod.yml
-./generate-secrets.sh                        # writes solidtime.prod.env
+./generate-secrets.sh                        # writes worklogd.prod.env
 # edit docker-compose.prod.yml: APP_URL, SUPER_ADMINS and the mail settings
 docker compose -f docker-compose.prod.yml up -d
 ```
