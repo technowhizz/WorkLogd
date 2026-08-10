@@ -10,7 +10,7 @@ import {
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import TimeTrackerProjectTaskDropdown from '@/packages/ui/src/TimeTracker/TimeTrackerProjectTaskDropdown.vue';
 import { Field, FieldLabel } from '../field';
-import { TagIcon } from '@heroicons/vue/20/solid';
+import { ArrowTopRightOnSquareIcon, TagIcon } from '@heroicons/vue/20/solid';
 import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 import type {
     CreateClientBody,
@@ -207,10 +207,25 @@ const externalReference = computed(() =>
                     <div v-if="tracksExternalReferences" class="shrink-0 sm:pb-1.5">
                         <span
                             v-if="externalReference"
-                            class="inline-flex items-center rounded-md border border-border bg-secondary px-2 py-1 font-mono text-xs font-medium text-text-primary"
+                            class="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary px-2 py-1 font-mono text-xs font-medium text-text-primary"
                             data-testid="time_entry_external_reference"
                             title="This time will be logged against this ticket">
                             {{ externalReference.label }}
+                            <!--
+                                Only when the host gave a url - a reference is worth showing even
+                                when there is nowhere to send someone.
+                            -->
+                            <a
+                                v-if="externalReference.url"
+                                :href="externalReference.url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="-mr-0.5 flex h-4 w-4 items-center justify-center rounded outline-0 focus-visible:ring-2 focus-visible:ring-ring"
+                                data-testid="time_entry_external_reference_open"
+                                :title="`Open ${externalReference.label} in a new tab`">
+                                <ArrowTopRightOnSquareIcon
+                                    class="h-3.5 w-3.5 text-text-tertiary transition hover:text-text-secondary" />
+                            </a>
                         </span>
                         <span
                             v-else

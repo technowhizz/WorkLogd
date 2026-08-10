@@ -3,6 +3,7 @@ import {
     describeInvalidRange,
     describeSkipReason,
     detectIssueKey,
+    issueBrowseUrl,
     missingReferenceBadges,
     parseProjectKeys,
     toExternalSyncBadges,
@@ -328,6 +329,30 @@ describe('detectIssueKey', () => {
 
     it('skips to the first allowed key', () => {
         expect(detectIssueKey('fixed UTF-8 handling for PROJ-9', ['PROJ'])).toBe('PROJ-9');
+    });
+});
+
+describe('issueBrowseUrl', () => {
+    it('builds the site permalink for an issue', () => {
+        expect(issueBrowseUrl('https://acme.atlassian.net', 'OPS-7')).toBe(
+            'https://acme.atlassian.net/browse/OPS-7'
+        );
+    });
+
+    it('does not double the slash when the site url has a trailing one', () => {
+        expect(issueBrowseUrl('https://acme.atlassian.net/', 'OPS-7')).toBe(
+            'https://acme.atlassian.net/browse/OPS-7'
+        );
+        expect(issueBrowseUrl('https://acme.atlassian.net///', 'OPS-7')).toBe(
+            'https://acme.atlassian.net/browse/OPS-7'
+        );
+    });
+
+    it('returns null without both parts, so callers can show a reference with no link', () => {
+        expect(issueBrowseUrl(null, 'OPS-7')).toBeNull();
+        expect(issueBrowseUrl('  ', 'OPS-7')).toBeNull();
+        expect(issueBrowseUrl('https://acme.atlassian.net', null)).toBeNull();
+        expect(issueBrowseUrl('https://acme.atlassian.net', '')).toBeNull();
     });
 });
 

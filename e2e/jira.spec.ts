@@ -905,6 +905,10 @@ test('test that the edit dialog shows the detected ticket and follows the descri
 
     // Assert
     await expect(page.getByTestId('time_entry_external_reference')).toHaveText('PROJ-42');
+    // The ticket can be opened on the organization's site, in a new tab
+    const openTicket = page.getByTestId('time_entry_external_reference_open');
+    await expect(openTicket).toHaveAttribute('href', SITE_URL + '/browse/PROJ-42');
+    await expect(openTicket).toHaveAttribute('target', '_blank');
 
     // Act: the badge tracks the description as it is typed, so a fix is confirmed immediately
     await page.locator('#description').fill('no ticket in here now');
@@ -918,6 +922,10 @@ test('test that the edit dialog shows the detected ticket and follows the descri
 
     // Assert
     await expect(page.getByTestId('time_entry_external_reference')).toHaveText('OPS-7');
+    await expect(page.getByTestId('time_entry_external_reference_open')).toHaveAttribute(
+        'href',
+        SITE_URL + '/browse/OPS-7'
+    );
 });
 
 test('test that the edit dialog shows no ticket box until you opt in', async ({ page }) => {

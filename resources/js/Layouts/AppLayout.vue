@@ -48,6 +48,7 @@ import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
 import {
     adoptLegacyMissingTicketHintsSetting,
     detectIssueKey,
+    issueBrowseUrl,
     parseProjectKeys,
     showMissingTicketHintsSetting,
 } from '@/utils/jira';
@@ -122,9 +123,16 @@ provide(
         }
 
         const allowedKeys = parseProjectKeys(organization.value?.jira_project_keys);
+        const site = jiraSiteUrl.value;
         return (description) => {
             const issueKey = detectIssueKey(description, allowedKeys);
-            return issueKey === null ? null : { label: issueKey };
+            if (issueKey === null) {
+                return null;
+            }
+
+            // url ?? undefined because the field is optional rather than nullable - the package
+            // treats its absence as "cannot be opened"
+            return { label: issueKey, url: issueBrowseUrl(site, issueKey) ?? undefined };
         };
     })
 );

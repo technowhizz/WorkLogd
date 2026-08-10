@@ -286,6 +286,26 @@ export function detectIssueKey(
     return null;
 }
 
+/**
+ * Where an issue lives on the organization's Jira site, ex. https://acme.atlassian.net/browse/OPS-7.
+ *
+ * `/browse/<key>` is Jira's own permalink for an issue and resolves whatever project it belongs
+ * to. The stored site URL is trimmed of trailing slashes, which an admin can easily leave on and
+ * which would otherwise produce a double slash.
+ */
+export function issueBrowseUrl(
+    siteUrl: string | null | undefined,
+    issueKey: string | null | undefined
+): string | null {
+    const site = (siteUrl ?? '').trim().replace(/\/+$/, '');
+    const key = (issueKey ?? '').trim();
+    if (site === '' || key === '') {
+        return null;
+    }
+
+    return `${site}/browse/${encodeURIComponent(key)}`;
+}
+
 /** Parses the organization's comma separated allow list, matching JiraConfig::parseProjectKeys. */
 export function parseProjectKeys(value: string | null | undefined): string[] {
     return (value ?? '')

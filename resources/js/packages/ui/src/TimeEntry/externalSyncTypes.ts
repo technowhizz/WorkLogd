@@ -32,6 +32,11 @@ export type ExternalSyncBadges = Record<string, ExternalSyncBadge>;
 export interface ExternalReference {
     /** Short label to show, ex. "PROJ-123". */
     label: string;
+    /**
+     * Where the item lives, if it can be opened. Built by the host, since only it knows how its
+     * provider addresses an item - this package just offers it as a link when one is given.
+     */
+    url?: string;
 }
 
 /**
