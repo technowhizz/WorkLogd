@@ -15,7 +15,7 @@ use App\Http\Resources\V1\Jira\JiraConnectionResource;
 use App\Jobs\SyncJiraWorklogs;
 use App\Models\JiraConnection;
 use App\Models\Organization;
-use App\Service\Jira\JiraClient;
+use App\Service\Jira\JiraClientContract;
 use App\Service\Jira\JiraConfig;
 use App\Service\Jira\JiraSyncRunStore;
 use App\Service\Jira\JiraSyncService;
@@ -84,7 +84,7 @@ class JiraController extends Controller
         $connection->requires_reauthentication = false;
 
         // Deliberately before save(), so failed credentials leave no connection behind
-        $profile = app(JiraClient::class)->myself($connection);
+        $profile = app(JiraClientContract::class)->myself($connection);
 
         $connection->account_id = $profile['account_id'];
         $connection->display_name = $profile['display_name'];

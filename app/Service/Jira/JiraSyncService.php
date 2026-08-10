@@ -27,7 +27,7 @@ class JiraSyncService
 {
     public function __construct(
         private readonly JiraConfig $config,
-        private readonly JiraClient $client,
+        private readonly JiraClientContract $client,
         private readonly JiraWorklogGrouper $grouper,
     ) {}
 

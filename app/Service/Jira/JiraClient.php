@@ -20,8 +20,11 @@ use Illuminate\Support\Facades\Log;
  * Deliberately built on the Http facade rather than a Guzzle client of its own, so that
  * Http::preventStrayRequests() in tests/TestCase.php actually covers it - the trap the Google
  * integration hit with Socialite.
+ *
+ * The only implementation of JiraClientContract that ever talks to Atlassian. The interface
+ * exists so the browser suite can substitute FakeJiraClient; nothing here changes for it.
  */
-class JiraClient
+class JiraClient implements JiraClientContract
 {
     private const int TIMEOUT_SECONDS = 20;
 

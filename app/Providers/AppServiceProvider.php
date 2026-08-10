@@ -19,6 +19,9 @@ use App\Models\User;
 use App\Service\BillingContract;
 use App\Service\IpLookup\IpLookupServiceContract;
 use App\Service\IpLookup\NoIpLookupService;
+use App\Service\Jira\FakeJiraClient;
+use App\Service\Jira\JiraClient;
+use App\Service\Jira\JiraClientContract;
 use App\Service\PermissionStore;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
@@ -97,6 +100,19 @@ class AppServiceProvider extends ServiceProvider
         // Extensions
         $this->app->bind(IpLookupServiceContract::class, NoIpLookupService::class);
         $this->app->bind(BillingContract::class);
+
+        /*
+         * Jira. The real client is what everything resolves to; FakeJiraClient is a test seam for
+         * the browser suite and is gated on both a config flag and a non-production environment -
+         * see FakeJiraClient::isEnabled(). bind() rather than singleton() so the gate is
+         * re-evaluated per resolution, which is what lets FakeJiraClientBindingTest prove that a
+         * production environment gets the real client even with the flag on.
+         */
+        $this->app->bind(JiraClientContract::class, static function (Application $app): JiraClientContract {
+            return FakeJiraClient::isEnabled()
+                ? $app->make(FakeJiraClient::class)
+                : $app->make(JiraClient::class);
+        });
 
         // Routing
         Route::model('member', Member::class);
