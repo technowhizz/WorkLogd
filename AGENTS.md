@@ -104,6 +104,14 @@ directory. Build features in `app/`, not as an extension.
   names only the GET route and leaves the POST unnamed, so the middleware matches on the URI.
   Invited people are the exception and can register while it is off, checked against the invitations
   table rather than the session flag that reveals the screen.
+- **The personal access client is a database row, not configuration.** Passport 13 resolves it by
+  querying `oauth_clients` for a non-revoked client holding the `personal_access` grant, and the
+  grant never transmits a client secret. `PASSPORT_PERSONAL_ACCESS_CLIENT_ID`/`_SECRET` were removed
+  in that major — they appear only in Passport's `UPGRADE.md` and are read by nothing here.
+  `self-host:ensure-personal-access-client` creates the row and runs on every container boot.
+- **`docker/prod/deployment/start-container` creates `storage/` itself.** A bind-mounted `storage/`
+  starts empty and masks the image's copy — unlike a named volume, which Docker seeds — so without
+  it the container dies on `Please provide a valid cache path`.
 - API errors extend `app/Exceptions/Api/ApiException.php` → renders **400** with `{error, key, message}`,
   message in `lang/en/exceptions.php`.
 - Timestamps in API requests are strictly `date_format:Y-m-d\TH:i:s\Z` — UTC, no offsets.

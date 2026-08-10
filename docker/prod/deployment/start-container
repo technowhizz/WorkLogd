@@ -4,14 +4,47 @@ set -e
 container_mode=${CONTAINER_MODE:-"http"}
 octane_server=${OCTANE_SERVER}
 auto_db_migrate=${AUTO_DB_MIGRATE:-false}
+# Set as ENV in the image; defaulted here so an override that drops it cannot turn the storage
+# paths below into /storage/... at the filesystem root.
+app_root=${ROOT:-/var/www/html}
+
+# A named volume for storage/ is seeded with the image's copy of it, but a bind mount is not -
+# it masks whatever the image had, so an empty host directory leaves Laravel without the
+# directories it assumes exist and the container dies on "Please provide a valid cache path".
+# Recreating them here costs nothing when they are already present.
+ensureStorageDirectories() {
+    for directory in \
+        app/public \
+        framework/cache/data \
+        framework/sessions \
+        framework/views \
+        logs
+    do
+        if ! mkdir -p "${app_root}/storage/${directory}"; then
+            echo "Cannot create ${app_root}/storage/${directory}."
+            echo "This container runs as uid $(id -u), gid $(id -g). If storage/ is a bind mount,"
+            echo "make the host directory writable by that user, e.g.:"
+            echo "  chown -R $(id -u):$(id -g) /your/host/path/storage"
+            exit 1
+        fi
+    done
+}
 
 initialStuff() {
     echo "Container mode: $container_mode"
+
+    ensureStorageDirectories
 
     if [ ${auto_db_migrate} = "true" ]; then
         echo "Auto database migration enabled."
         php artisan migrate --isolated --force
     fi
+
+    # The API token screen mints tokens through a personal access client, which is a row in
+    # oauth_clients rather than configuration. Idempotent, and it steps aside without failing
+    # when the database is not migrated yet. --isolated because app, worker and scheduler all
+    # reach this at the same time.
+    php artisan self-host:ensure-personal-access-client --isolated
 
     php artisan storage:link; \
     php artisan optimize:clear; \
