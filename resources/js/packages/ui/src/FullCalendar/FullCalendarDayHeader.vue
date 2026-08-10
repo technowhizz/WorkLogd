@@ -43,7 +43,9 @@ const durationSummary = computed(() => {
 <template>
     <div class="fc-day-header-custom">
         <div class="text-sm text-foreground" :class="isToday ? 'font-semibold' : 'font-medium'">
-            {{ date.format('ddd') }} {{ date.date() }}
+            <!-- Month included so a week spanning two of them is unambiguous - the toolbar title
+                 only ever names one -->
+            {{ date.format('ddd D MMM') }}
         </div>
         <span
             class="block text-xs text-muted-foreground font-medium mt-0.5"

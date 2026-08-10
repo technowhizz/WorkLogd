@@ -188,7 +188,12 @@ const {
     initialDate: props.initialDate ? getLocalizedDayJsFromMinutes(props.initialDate, 0) : null,
 });
 
-const cssBackground = useCssVariable('--color-bg-background');
+/*
+ * What chips are mixed and alpha-composited toward, so it has to be the surface they actually sit
+ * on - the grid body - rather than the page behind it. Mixing toward the ground while sitting on
+ * the brighter grid would leave every pale project colour looking faintly dirty.
+ */
+const cssBackground = useCssVariable('--theme-color-card-background');
 
 const {
     optimisticOverrides,
@@ -706,14 +711,23 @@ function getEventDurationSeconds(dayEvent: DayEvent, dayStr: string): number {
                                 :style="{
                                     gridTemplateColumns: 'repeat(' + viewDays.length + ', 1fr)',
                                 }">
+                                <!--
+                                    Today is marked on its header cell and nowhere else: tinting the
+                                    whole column reads as a state the day is in rather than a label.
+                                    A neutral step, not the accent, which is the brand signal red.
+                                    Steps away from the header band in both themes - darker in
+                                    light, lighter in dark.
+                                -->
                                 <div
                                     v-for="day in viewDays"
                                     :key="day.format('YYYY-MM-DD')"
                                     class="fc-col-header-cell border-r border-border px-2 py-3 bg-default-background text-center"
-                                    :class="{
-                                        'bg-secondary': isToday(day),
-                                        'fc-day-today': isToday(day),
-                                    }"
+                                    :class="{ 'fc-day-today': isToday(day) }"
+                                    :style="
+                                        isToday(day)
+                                            ? { backgroundColor: 'var(--color-bg-quaternary)' }
+                                            : undefined
+                                    "
                                     :data-date="day.format('YYYY-MM-DD')">
                                     <FullCalendarDayHeader
                                         :date="day"
@@ -758,27 +772,16 @@ function getEventDurationSeconds(dayEvent: DayEvent, dayStr: string): number {
                                 <div
                                     class="flex-1 min-w-0 relative"
                                     @pointerdown="guardedSlotPointerDown($event)">
+                                    <!--
+                                        The content surface. Deliberately a step brighter than the
+                                        header band and the time axis, which stay on the ground
+                                        token: the grid is what you are reading, the chrome around
+                                        it is not. Both themes get the same relationship, since
+                                        card-background is above default-background in each.
+                                    -->
                                     <div
-                                        class="bg-default-background relative"
+                                        class="bg-card-background relative"
                                         :style="{ height: totalGridHeight + 'px' }">
-                                        <div
-                                            class="absolute inset-0 grid"
-                                            :style="{
-                                                gridTemplateColumns:
-                                                    'repeat(' + viewDays.length + ', 1fr)',
-                                            }">
-                                            <div
-                                                v-for="day in viewDays"
-                                                :key="'bg-' + day.format('YYYY-MM-DD')"
-                                                :style="
-                                                    isToday(day)
-                                                        ? {
-                                                              backgroundColor:
-                                                                  'var(--theme-color-default-background)',
-                                                          }
-                                                        : undefined
-                                                " />
-                                        </div>
                                         <div
                                             v-for="slot in slots"
                                             :key="'lane-' + slot.time"
