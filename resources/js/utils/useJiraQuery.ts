@@ -170,7 +170,16 @@ export function useJiraSync() {
     const isSyncing = ref(false);
     const error = ref<string | null>(null);
 
+    /*
+     * Nothing here can cancel an in-flight preview, so every request carries a ticket and only
+     * the newest one is allowed to write. Without it, changing the range twice in quick
+     * succession shows whichever response happens to land last - and a response that arrives
+     * after the dialog was closed would resurrect the plan that reset() just threw away.
+     */
+    let latestPlanRequest = 0;
+
     function reset() {
+        latestPlanRequest++;
         plan.value = null;
         run.value = null;
         error.value = null;
@@ -179,6 +188,7 @@ export function useJiraSync() {
     }
 
     async function loadPlan(startDate: string, endDate: string) {
+        const request = ++latestPlanRequest;
         isLoadingPlan.value = true;
         error.value = null;
         try {
@@ -186,11 +196,20 @@ export function useJiraSync() {
                 params: { organization: organizationId() },
                 queries: { start: startDate, end: endDate },
             });
+            if (request !== latestPlanRequest) {
+                return;
+            }
             plan.value = response.data;
         } catch (e: unknown) {
+            if (request !== latestPlanRequest) {
+                return;
+            }
             error.value = messageFor(e, 'Failed to work out what needs syncing');
         } finally {
-            isLoadingPlan.value = false;
+            // A superseded request must not clear the spinner the newer one is still showing
+            if (request === latestPlanRequest) {
+                isLoadingPlan.value = false;
+            }
         }
     }
 

@@ -12,7 +12,12 @@ import JiraSyncDialog from '@/Components/Jira/JiraSyncDialog.vue';
 
 const props = defineProps<{
     isConnected: boolean;
-    /** Local dates (YYYY-MM-DD) of the range currently on screen. */
+    /**
+     * The calendar's visible window in local dates (YYYY-MM-DD), both ends **inclusive** —
+     * `endDate` is the last visible column. The page converts the half open window that
+     * `dates-change` emits, so everything downstream of it speaks the same dialect as the Jira
+     * endpoints.
+     */
     startDate: string | null;
     endDate: string | null;
 }>();

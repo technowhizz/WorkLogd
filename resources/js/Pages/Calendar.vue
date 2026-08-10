@@ -127,10 +127,20 @@ const externalCalendarEvents = computed<ExternalCalendarEvent[]>(() =>
     }))
 );
 
-// The Jira range is the visible one in local dates, since a worklog belongs to the day the
-// work happened rather than to a UTC instant
+/*
+ * The Jira range is the visible one in local dates, since a worklog belongs to the day the work
+ * happened rather than to a UTC instant.
+ *
+ * `dates-change` reports a half open window — `end` is the day *after* the last column, which is
+ * what the time entry query wants — but every Jira endpoint takes an inclusive last day. The
+ * conversion happens once, here, so that both consumers below agree. Getting it wrong is quiet:
+ * it just offers a day more than is on screen, and with fewer than seven days visible that day
+ * is one the user cannot see.
+ */
 const jiraStartDate = computed(() => calendarStart.value?.format('YYYY-MM-DD') ?? null);
-const jiraEndDate = computed(() => calendarEnd.value?.format('YYYY-MM-DD') ?? null);
+const jiraEndDate = computed(
+    () => calendarEnd.value?.subtract(1, 'day').format('YYYY-MM-DD') ?? null
+);
 const {
     isJiraEnabled: jiraEnabled,
     isConnected: isJiraConnected,

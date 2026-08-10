@@ -5,7 +5,6 @@ import { RangeCalendar } from '../range-calendar';
 import { CalendarDate } from '@internationalized/date';
 import { CalendarIcon } from '@lucide/vue';
 import { computed, ref, inject, type ComputedRef, watch } from 'vue';
-import { twMerge } from 'tailwind-merge';
 import {
     getDayJsInstance,
     getLocalizedDayJs,
@@ -66,6 +65,16 @@ const modelValue = computed<CalendarDateRange>({
             emit('update:end', getLocalizedDayJs(date.toString()).format());
         } else {
             emit('update:end', '');
+        }
+
+        /*
+         * A complete range ends the interaction, so the popover gets out of the way exactly as
+         * the shortcuts on the left already do, and `submit` fires without needing a click
+         * elsewhere. The first click of a two click range arrives here with a start and no end,
+         * and closing on that would strand a half chosen range - hence both.
+         */
+        if (newValue.start && newValue.end) {
+            open.value = false;
         }
     },
 });
@@ -150,14 +159,14 @@ watch(open, (value) => {
 <template>
     <Popover v-model:open="open">
         <PopoverTrigger as-child>
+            <!--
+                justify-between so the trigger can be stretched to the width of a filter bar.
+                A caller that gives it a fixed width with little in it wants justify-start,
+                which it can set from the outside.
+            -->
             <Button
                 variant="outline"
-                :class="
-                    twMerge(
-                        'flex w-full items-center justify-between whitespace-nowrap h-[34px] text-start',
-                        !modelValue && 'text-muted-foreground'
-                    )
-                ">
+                class="flex w-full items-center justify-between whitespace-nowrap h-[34px] text-start">
                 <CalendarIcon class="-ml-0.5 text-text-quaternary h-4 w-4" />
                 <template v-if="modelValue.start">
                     <template v-if="modelValue.end">
