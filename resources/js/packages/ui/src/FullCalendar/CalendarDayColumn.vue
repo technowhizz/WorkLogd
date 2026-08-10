@@ -14,6 +14,31 @@ const EXTERNAL_LANE_WIDTH = '25%';
 /** Breathing room so events do not touch the column borders. */
 const COLUMN_GAP = '2px';
 
+/*
+ * Resize grips, and the room a click needs next to them.
+ *
+ * The grips are full-width strips pinned to the two edges, and `opacity: 0` still hit-tests —
+ * so on a short block the pair covers the whole thing. That is not merely a nuisance: a
+ * pointer-down on a grip is deliberately *not* a click on the entry (`useEventDrag` bails out
+ * on `.fc-event-resizer`), and that click is the only route to the edit dialog. A 15-minute
+ * entry is 25px tall at the default zoom and 4px at the minimum, so a fully covered block was
+ * the normal case rather than the edge case.
+ *
+ * Opening the entry therefore wins: it is the operation the grips are a shortcut *for* — the
+ * dialog edits the same two timestamps as text — so the grips shrink, and then go, as the
+ * block runs out of room. Below the last threshold you resize by zooming in, which restores
+ * them, or by typing the times in the dialog the click now reliably opens.
+ */
+const RESIZER_HEIGHT = 12;
+const RESIZER_COMPACT_HEIGHT = 6;
+/** Each grip is offset 2px outside the block, so it only eats `height - 2` of it. */
+const RESIZER_OVERHANG = 2;
+/**
+ * Height that must stay clear of every grip for the block to be clickable. Same 16px the
+ * activity boxes ask for before they draw anything into themselves.
+ */
+const MIN_EVENT_CLICK_HEIGHT = 16;
+
 const props = defineProps<{
     dayStr: string;
     totalGridHeight: number;
@@ -31,6 +56,10 @@ const props = defineProps<{
     isDragging: boolean;
     dragEventId: string | null;
     dragPreview: Record<string, string> | undefined;
+    /** Only the cursor's column labels the move, so the numbers are not repeated per day. */
+    showDragLabels: boolean;
+    dragRangeLabel: string | null;
+    dragDurationLabel: string | null;
 
     // Resize state
     resizeEventId: string | null;
@@ -110,6 +139,51 @@ const selectionLabelStyle = computed<Record<string, string> | null>(() => {
     return null;
 });
 
+/**
+ * Geometry of the drag preview on this column, borrowed for the labels that ride on top of it.
+ * They are overlaid rather than nested so the preview's translucency does not wash the text
+ * out — the same reason the selection labels sit beside the ghost instead of inside it.
+ */
+const dragLabelStyle = computed<Record<string, string> | null>(() => {
+    if (!props.isDragging || !props.showDragLabels || !props.dragPreview) return null;
+    const { top, height } = props.dragPreview;
+    if (!top || !height) return null;
+    return { top, height };
+});
+
+/** A clipped edge is the middle of the entry, not an end of it, so it cannot be dragged. */
+function hasStartResizer(dayEvent: DayEvent): boolean {
+    return !dayEvent.isClippedStart;
+}
+
+/** A running entry has no end to move, which the stylesheet enforces for the running class too. */
+function hasEndResizer(dayEvent: DayEvent): boolean {
+    return !dayEvent.event.isRunning && !dayEvent.isClippedEnd;
+}
+
+/**
+ * Grip height for a block, or `0` when the block is too short to carry one and still be
+ * clickable. Counts only the grips this block actually renders, so an entry clipped by
+ * midnight — which shows one — keeps it down to half the height a two-grip block needs.
+ *
+ * Measured against the laid-out height rather than the live one during a resize: the gesture
+ * runs on document listeners once it has started, so a grip that disappears mid-drag would
+ * change nothing except where it is when you let go.
+ */
+function resizerHeight(dayEvent: DayEvent): number {
+    const grips = (hasStartResizer(dayEvent) ? 1 : 0) + (hasEndResizer(dayEvent) ? 1 : 0);
+    if (grips === 0) return 0;
+
+    const clickableHeight = (gripHeight: number) =>
+        dayEvent.height - grips * (gripHeight - RESIZER_OVERHANG);
+
+    if (clickableHeight(RESIZER_HEIGHT) >= MIN_EVENT_CLICK_HEIGHT) return RESIZER_HEIGHT;
+    if (clickableHeight(RESIZER_COMPACT_HEIGHT) >= MIN_EVENT_CLICK_HEIGHT) {
+        return RESIZER_COMPACT_HEIGHT;
+    }
+    return 0;
+}
+
 function isUncoveredByEvents(abox: ActivityBox): boolean {
     return !props.dayEvents.some((de) => {
         const eTop = de.top;
@@ -171,8 +245,9 @@ const emit = defineEmits<{
                             @pointerdown="emit('event-pointerdown', $event, dayEvent)"
                             @keydown.enter.prevent="emit('event-keydown-enter', dayEvent)">
                             <div
-                                v-if="!dayEvent.isClippedStart"
-                                class="fc-event-resizer fc-event-resizer-start absolute z-[99] w-full h-3 left-0 top-[-2px] cursor-row-resize flex items-center justify-center opacity-0 group-hover:opacity-100"
+                                v-if="hasStartResizer(dayEvent) && resizerHeight(dayEvent) > 0"
+                                class="fc-event-resizer fc-event-resizer-start absolute z-[99] w-full left-0 top-[-2px] cursor-row-resize flex items-center justify-center opacity-0 group-hover:opacity-100"
+                                :style="{ height: resizerHeight(dayEvent) + 'px' }"
                                 @pointerdown.stop.prevent="
                                     emit('resizer-pointerdown', $event, dayEvent, 'start')
                                 "></div>
@@ -188,8 +263,9 @@ const emit = defineEmits<{
                                     :duration-seconds="getEventDurationSeconds(dayEvent, dayStr)" />
                             </div>
                             <div
-                                v-if="!dayEvent.event.isRunning && !dayEvent.isClippedEnd"
-                                class="fc-event-resizer fc-event-resizer-end absolute z-[99] w-full h-3 left-0 bottom-[-2px] cursor-row-resize flex items-center justify-center opacity-0 group-hover:opacity-100"
+                                v-if="hasEndResizer(dayEvent) && resizerHeight(dayEvent) > 0"
+                                class="fc-event-resizer fc-event-resizer-end absolute z-[99] w-full left-0 bottom-[-2px] cursor-row-resize flex items-center justify-center opacity-0 group-hover:opacity-100"
+                                :style="{ height: resizerHeight(dayEvent) + 'px' }"
                                 @pointerdown.stop.prevent="
                                     emit('resizer-pointerdown', $event, dayEvent, 'end')
                                 "></div>
@@ -209,8 +285,19 @@ const emit = defineEmits<{
                         :side-offset="-4"
                         :collision-padding="8"
                         class="fc-event-tooltip pointer-events-none">
+                        <!--
+                            `description` is the typed text rather than the decorated title
+                            ("Break · …", "No description"), so whatever the host detects
+                            references with sees what the person actually wrote. Breaks are not
+                            work and are never logged against an issue — the same reason they are
+                            skipped when the missing-ticket dots are computed — so they offer
+                            nothing to detect.
+                        -->
                         <FullCalendarEventTooltip
                             :title="dayEvent.event.title"
+                            :description="
+                                dayEvent.event.isBreak ? null : dayEvent.event.timeEntry.description
+                            "
                             :start="dayEvent.event.timeEntry.start"
                             :end="dayEvent.event.timeEntry.end"
                             :duration-seconds="getEventDurationSeconds(dayEvent, dayStr)"
@@ -375,16 +462,14 @@ const emit = defineEmits<{
              it, so the same markup serves the single-day and cross-day boxes. -->
         <div
             v-if="showSelection && showSelectionLabels && selectionLabelStyle"
-            class="fc-selection-labels absolute inset-x-0 pointer-events-none overflow-hidden z-[3]"
+            class="fc-gesture-labels absolute inset-x-0 pointer-events-none overflow-hidden z-[3]"
             :style="selectionLabelStyle">
             <div
-                class="fc-selection-labels-inner h-full flex flex-col px-1 py-0.5 text-[11px] leading-tight font-medium tabular-nums text-text-primary">
-                <span class="fc-selection-range truncate" data-selection-range>
+                class="fc-gesture-labels-inner h-full flex flex-col px-1 py-0.5 text-[11px] leading-tight font-medium tabular-nums text-text-primary">
+                <span class="fc-gesture-range truncate" data-selection-range>
                     {{ selectionRangeLabel }}
                 </span>
-                <span
-                    class="fc-selection-duration mt-auto self-end shrink-0"
-                    data-selection-duration>
+                <span class="fc-gesture-duration mt-auto self-end shrink-0" data-selection-duration>
                     {{ selectionDurationLabel }}
                 </span>
             </div>
@@ -394,6 +479,24 @@ const emit = defineEmits<{
             v-if="isDragging && dragPreview"
             class="fc-cross-day-preview pointer-events-none mx-px"
             :style="dragPreview"></div>
+
+        <!-- The same live read for a move: where the entry would land, stated on the preview so
+             dragging an entry answers the same question as dragging a new one out. Sits above
+             the preview's own z-index of 100. -->
+        <div
+            v-if="dragLabelStyle"
+            class="fc-gesture-labels absolute inset-x-0 mx-px pointer-events-none overflow-hidden z-[101]"
+            :style="dragLabelStyle">
+            <div
+                class="fc-gesture-labels-inner h-full flex flex-col px-1 py-0.5 text-[11px] leading-tight font-medium tabular-nums text-text-primary">
+                <span class="fc-gesture-range truncate" data-drag-range>
+                    {{ dragRangeLabel }}
+                </span>
+                <span class="fc-gesture-duration mt-auto self-end shrink-0" data-drag-duration>
+                    {{ dragDurationLabel }}
+                </span>
+            </div>
+        </div>
 
         <div
             v-if="resizeCrossDayPreview"
@@ -416,29 +519,34 @@ const emit = defineEmits<{
     border-color: var(--fc-selection-border);
 }
 
-/* Query target for the compact layouts below — an element cannot query itself. */
-.fc-selection-labels {
+/*
+ * Shared by the two live gesture readouts — drawing a new entry and moving an existing one —
+ * which ask the same question of the same box and so shed detail identically.
+ *
+ * Query target for the compact layouts below; an element cannot query itself.
+ */
+.fc-gesture-labels {
     container-type: size;
 }
 
 /*
- * A 15-minute selection is 25px tall at the default zoom but only 4px at the minimum, so the
- * labels shed detail as the box shrinks instead of spilling out of it. Same progression as the
- * compact layout in FullCalendarEventContent.vue.
+ * A 15-minute box is 25px tall at the default zoom but only 4px at the minimum, so the labels
+ * shed detail as it shrinks instead of spilling out of it. Same progression as the compact
+ * layout in FullCalendarEventContent.vue.
  */
 @container (max-height: 40px) {
-    .fc-selection-labels-inner {
+    .fc-gesture-labels-inner {
         flex-direction: row;
         align-items: center;
         gap: 4px;
         padding-top: 0;
         padding-bottom: 0;
     }
-    .fc-selection-range {
+    .fc-gesture-range {
         flex: 1 1 auto;
         min-width: 0;
     }
-    .fc-selection-duration {
+    .fc-gesture-duration {
         margin-top: 0;
         margin-left: auto;
         align-self: center;
@@ -450,17 +558,17 @@ const emit = defineEmits<{
  * says where the box starts. Day view columns are wide enough to keep both.
  */
 @container (max-height: 40px) and (max-width: 220px) {
-    .fc-selection-range {
+    .fc-gesture-range {
         display: none;
     }
 }
 @container (max-height: 18px) {
-    .fc-selection-range {
+    .fc-gesture-range {
         display: none;
     }
 }
 @container (max-height: 12px) {
-    .fc-selection-labels-inner {
+    .fc-gesture-labels-inner {
         display: none;
     }
 }
@@ -474,6 +582,16 @@ const emit = defineEmits<{
 }
 .fc-event-resizer:hover::after {
     background: rgba(255, 255, 255, 0.9);
+}
+
+/*
+ * The block the pointer is moving wears the closed hand. `body.fc-dragging-active` in
+ * TimeEntryCalendar.vue is what actually carries it while the pointer roams the document; this
+ * keeps the class meaningful on the block itself rather than being applied to nothing.
+ */
+.fc-event-dragging,
+.fc-event-dragging .fc-event-resizer {
+    cursor: grabbing;
 }
 
 .fc-event-resizing,

@@ -234,7 +234,15 @@ const { externalEventBoxesForDay, hasAnyExternalEvents } = useExternalEventBoxes
     timeToMinutesFromMidnight,
 });
 
-const { isDragging, dragEventId, dragPreviewsByDay, onEventPointerDown } = useEventDrag({
+const {
+    isDragging,
+    dragEventId,
+    dragCurrentDay,
+    dragPreviewsByDay,
+    dragTimes,
+    dragDurationSeconds,
+    onEventPointerDown,
+} = useEventDrag({
     calendarSettings,
     viewDays,
     optimisticOverrides,
@@ -329,6 +337,31 @@ const selectionRangeLabel = computed(() => {
  * otherwise the single selected day. Intermediate full-height columns never get them.
  */
 const selectionLabelDay = computed(() => selectionEndDay.value ?? selectionDay.value);
+
+/*
+ * The same treatment for moving an existing entry: while it is being dragged its preview
+ * states where it would land, so a move is as readable as drawing a new entry. Formatted with
+ * the same helpers for the same reason — the numbers must match the entry once it lands.
+ */
+const dragDurationLabel = computed(() =>
+    dragDurationSeconds.value === null
+        ? null
+        : formatHumanReadableDuration(
+              dragDurationSeconds.value,
+              organization?.value?.interval_format,
+              organization?.value?.number_format
+          )
+);
+
+const dragRangeLabel = computed(() => {
+    const times = dragTimes.value;
+    if (!times) return null;
+    return formatStartEnd(
+        times.start.toISOString(),
+        times.end.toISOString(),
+        organization?.value?.time_format
+    );
+});
 
 /*
  * The ghost wears the colors of the entry the drag is about to create, which has no project
@@ -788,6 +821,11 @@ function getEventDurationSeconds(dayEvent: DayEvent, dayStr: string): number {
                                             :drag-preview="
                                                 dragPreviewsByDay[day.format('YYYY-MM-DD')]
                                             "
+                                            :show-drag-labels="
+                                                dragCurrentDay === day.format('YYYY-MM-DD')
+                                            "
+                                            :drag-range-label="dragRangeLabel"
+                                            :drag-duration-label="dragDurationLabel"
                                             :resize-event-id="resizeEventId"
                                             :resize-cross-day-preview="
                                                 isResizing
@@ -982,8 +1020,18 @@ function getEventDurationSeconds(dayEvent: DayEvent, dayStr: string): number {
 </style>
 
 <style>
+/*
+ * A pointer gesture keeps its cursor even when the pointer outruns the element it started on,
+ * which it routinely does — so both overrides are document-wide and win over whatever is under
+ * the pointer. The classes are added by the composables that own the gesture.
+ */
 body.fc-resizing-active,
 body.fc-resizing-active * {
     cursor: row-resize !important;
+}
+
+body.fc-dragging-active,
+body.fc-dragging-active * {
+    cursor: grabbing !important;
 }
 </style>

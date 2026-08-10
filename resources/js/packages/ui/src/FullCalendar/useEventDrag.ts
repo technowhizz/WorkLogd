@@ -24,6 +24,13 @@ export function useEventDrag(params: {
     const dragEventId = ref<string | null>(null);
     const dragOffsetMinutes = ref(0);
     const dragCurrentTop = ref(0);
+    /**
+     * Snapped, clamped minutes-from-midnight where the dragged segment currently starts.
+     * `dragCurrentTop` is this same value in pixels; keeping the minutes as well means the
+     * live times are read off the number the gesture actually produced rather than a
+     * pixel round-trip back through the zoom factor.
+     */
+    const dragCurrentMinutes = ref(0);
     const dragCurrentDay = ref<string | null>(null);
     const dragOriginalDayStr = ref<string | null>(null);
     const dragOriginalHeight = ref(0);
@@ -46,7 +53,15 @@ export function useEventDrag(params: {
         escapeCancel.listen();
     }
 
+    /**
+     * The closed hand belongs to a move in progress, so it is switched on where the drag
+     * actually begins — at the threshold in `onDragPointerMove` — and not here, since the
+     * listeners are attached on pointer-down, while the gesture may still turn out to be a
+     * plain click. Switching it off in the teardown instead of at each exit covers pointer-up,
+     * escape-to-cancel and unmount alike, so the cursor can never be left stuck.
+     */
     function removeDragListeners() {
+        document.body.classList.remove('fc-dragging-active');
         document.removeEventListener('pointermove', onDragPointerMove);
         document.removeEventListener('pointerup', onDragPointerUp);
         escapeCancel.stop();
@@ -58,7 +73,8 @@ export function useEventDrag(params: {
      *
      * This also suppresses the click-to-edit path in `onDragPointerUp`, so
      * cancelling before the drag threshold is passed opens no modal either.
-     * Detaching the listeners makes the cancel terminal.
+     * Detaching the listeners makes the cancel terminal, and also drops the
+     * `fc-dragging-active` cursor override.
      */
     function cancelDrag() {
         removeDragListeners();
@@ -132,16 +148,14 @@ export function useEventDrag(params: {
             hasMoved = true;
             isDragging.value = true;
             dragEventId.value = dragOriginalEvent!.id;
+            document.body.classList.add('fc-dragging-active');
         }
 
-        const gridY = params.clientYToGridPixels(e.clientY);
         const s = params.calendarSettings.value;
         const startMin = s.startHour * 60;
 
-        const rawMinutes = params.pixelsToMinutesFromMidnight(gridY) - dragOffsetMinutes.value;
-        const snappedMinutes = Math.floor(rawMinutes / s.snapMinutes) * s.snapMinutes;
-        const lowerBound = startMin - 4 * 60;
-        const clampedMinutes = Math.max(lowerBound, Math.min(snappedMinutes, s.endHour * 60));
+        const clampedMinutes = clampedMinutesFromClientY(e.clientY);
+        dragCurrentMinutes.value = clampedMinutes;
         dragCurrentTop.value = params.minutesToPixels(clampedMinutes - startMin);
 
         const dayStr = params.getDayFromClientX(e.clientX);
@@ -149,6 +163,76 @@ export function useEventDrag(params: {
             dragCurrentDay.value = dayStr;
         }
     }
+
+    /**
+     * Where the dragged segment starts, in minutes from midnight, for a given cursor
+     * position: snapped to the grid and clamped to the visible window (with the same four
+     * hours of slack above it the move has always allowed).
+     */
+    function clampedMinutesFromClientY(clientY: number): number {
+        const s = params.calendarSettings.value;
+        const startMin = s.startHour * 60;
+        const gridY = params.clientYToGridPixels(clientY);
+        const rawMinutes = params.pixelsToMinutesFromMidnight(gridY) - dragOffsetMinutes.value;
+        const snappedMinutes = Math.floor(rawMinutes / s.snapMinutes) * s.snapMinutes;
+        const lowerBound = startMin - 4 * 60;
+        return Math.max(lowerBound, Math.min(snappedMinutes, s.endHour * 60));
+    }
+
+    /**
+     * Materializes the drag state into the times the entry would get. Pure and derived only
+     * from `dragCurrentMinutes` / `dragCurrentDay`, so it serves both the pointer-up commit
+     * and the live read the preview labels do mid-drag — what you see while dragging is by
+     * construction what gets saved.
+     *
+     * `null` while there is nothing to move: no event under the pointer, or a running entry,
+     * which has no end to shift.
+     */
+    function computeDraggedTimes(): { start: Dayjs; end: Dayjs } | null {
+        const ev = dragOriginalEvent;
+        if (!ev || !ev.timeEntry.end) return null;
+
+        const targetDateStr =
+            dragCurrentDay.value ||
+            dragOriginalDayStr.value ||
+            params.viewDays.value[0]!.format('YYYY-MM-DD');
+        const originalDayStr = dragOriginalDayStr.value || targetDateStr;
+
+        const s = params.calendarSettings.value;
+        const startMin = s.startHour * 60;
+
+        const originalSegmentStart = getLocalizedDayJsFromMinutes(
+            originalDayStr,
+            startMin + params.pixelsToMinutesFromMidnight(dragStartEventTop)
+        );
+        const newSegmentStart = getLocalizedDayJsFromMinutes(
+            targetDateStr,
+            dragCurrentMinutes.value
+        );
+        const deltaMs = newSegmentStart.diff(originalSegmentStart);
+
+        const origStart = getLocalizedDayJs(ev.timeEntry.start);
+        const origEnd = getLocalizedDayJs(ev.timeEntry.end);
+        const durationMs = origEnd.diff(origStart);
+        const newStartLocal = origStart.add(deltaMs, 'millisecond');
+
+        return { start: newStartLocal, end: newStartLocal.add(durationMs, 'millisecond') };
+    }
+
+    /**
+     * The moved entry's times as they stand right now, so the preview can show the range and
+     * duration *while* you drag rather than only once the entry has landed.
+     */
+    const dragTimes = computed<{ start: Dayjs; end: Dayjs } | null>(() =>
+        isDragging.value ? computeDraggedTimes() : null
+    );
+
+    const dragDurationSeconds = computed<number | null>(() => {
+        const times = dragTimes.value;
+        if (!times) return null;
+        const diff = times.end.diff(times.start, 'second');
+        return diff > 0 ? diff : 0;
+    });
 
     async function onDragPointerUp(e: PointerEvent) {
         removeDragListeners();
@@ -164,46 +248,24 @@ export function useEventDrag(params: {
             return;
         }
 
-        const targetDateStr =
-            dragCurrentDay.value ||
-            dragOriginalDayStr.value ||
-            params.viewDays.value[0]!.format('YYYY-MM-DD');
-        const savedOriginalDayStr = dragOriginalDayStr.value || targetDateStr;
+        // The pointer can travel between the last move event and the release, so the drop
+        // position is re-read here — the same `clientY` the commit has always used — and then
+        // materialized through the one function the live preview reads from.
+        dragCurrentMinutes.value = clampedMinutesFromClientY(e.clientY);
+        const times = computeDraggedTimes();
+        const timeEntry = dragOriginalEvent?.timeEntry;
 
         isDragging.value = false;
         dragEventId.value = null;
         dragOriginalDayStr.value = null;
         dragCurrentDay.value = null;
 
-        if (!dragOriginalEvent) return;
-        const timeEntry = dragOriginalEvent.timeEntry;
-        if (!timeEntry.end) return;
-
-        const s = params.calendarSettings.value;
-        const gridY = params.clientYToGridPixels(e.clientY);
-        const rawMinutes = params.pixelsToMinutesFromMidnight(gridY) - dragOffsetMinutes.value;
-        const snappedMinutes = Math.floor(rawMinutes / s.snapMinutes) * s.snapMinutes;
-        const startMin = s.startHour * 60;
-        const lowerBound = startMin - 4 * 60;
-        const clampedMinutes = Math.max(lowerBound, Math.min(snappedMinutes, s.endHour * 60));
-
-        const originalSegmentStart = getLocalizedDayJsFromMinutes(
-            savedOriginalDayStr,
-            startMin + params.pixelsToMinutesFromMidnight(dragStartEventTop)
-        );
-        const newSegmentStart = getLocalizedDayJsFromMinutes(targetDateStr, clampedMinutes);
-        const deltaMs = newSegmentStart.diff(originalSegmentStart);
-
-        const origStart = getLocalizedDayJs(timeEntry.start);
-        const origEnd = getLocalizedDayJs(timeEntry.end);
-        const durationMs = origEnd.diff(origStart);
-        const newStartLocal = origStart.add(deltaMs, 'millisecond');
-        const newEndLocal = newStartLocal.add(durationMs, 'millisecond');
+        if (!times || !timeEntry) return;
 
         const updatedTimeEntry = {
             ...timeEntry,
-            start: newStartLocal.utc().format(),
-            end: newEndLocal.utc().format(),
+            start: times.start.utc().format(),
+            end: times.end.utc().format(),
         } as TimeEntry;
 
         params.optimisticOverrides.value = new Map(params.optimisticOverrides.value).set(
@@ -323,6 +385,8 @@ export function useEventDrag(params: {
         dragOriginalHeight,
         dragVisibleDurationMinutes,
         dragPreviewsByDay,
+        dragTimes,
+        dragDurationSeconds,
         onEventPointerDown,
     };
 }
