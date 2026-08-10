@@ -191,7 +191,12 @@
     --theme-color-button-primary-border: #ec3013;
     --theme-color-button-primary-text: #ffffff;
 
-    --theme-color-input-background: transparent;
+    /* A surface of its own rather than transparent: left see-through, every field took the colour
+       of whatever it sat on, so inputs on the ground or on a modal read as cream boxes instead of
+       somewhere to type. Dark mode already gives them a fill (bg-secondary) for the same reason.
+       Anything that genuinely wants to blend in sets bg-transparent itself, as the timer bar's
+       description input does. */
+    --theme-color-input-background: var(--color-bg-primary);
 
     --theme-color-input-select-active: rgb(var(--color-accent-400));
     --theme-color-input-select-active-hover: rgb(var(--color-accent-500));
