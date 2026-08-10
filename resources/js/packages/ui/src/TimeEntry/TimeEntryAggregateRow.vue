@@ -70,6 +70,8 @@ const props = defineProps<{
     fixInCalendar?: (date: string) => void;
     /** Sync state per time entry id, when the page tracks one. */
     externalSyncBadges?: ExternalSyncBadges;
+    /** Hold the dot's space on rows without one, so descriptions line up down the list. */
+    reserveSyncIndicator?: boolean;
 }>();
 
 /** The group stands for several entries, so it shows the one that most needs attention. */
@@ -171,6 +173,7 @@ function onSelectChange(checked: boolean) {
                                 <!-- Midway between the count and the description: see TimeEntryRow -->
                                 <ExternalSyncIndicator
                                     :badge="aggregateSyncBadge"
+                                    :reserve-space="reserveSyncIndicator"
                                     class="ml-3.5 mr-0.5 shrink-0" />
                                 <TimeEntryDescriptionInput
                                     v-if="timeEntry.type !== 'break'"
@@ -282,6 +285,7 @@ function onSelectChange(checked: boolean) {
                                     <!-- Mobile: the input's padding is pl-1.5 rather than pl-3 -->
                                     <ExternalSyncIndicator
                                         :badge="aggregateSyncBadge"
+                                        :reserve-space="reserveSyncIndicator"
                                         class="ml-2 mr-0.5 shrink-0" />
                                     <TimeEntryDescriptionInput
                                         class="min-w-0 flex-1"
@@ -392,6 +396,7 @@ function onSelectChange(checked: boolean) {
                         :placement-hint="breakPlacementHints?.[subEntry.id] ?? null"
                         :fix-in-calendar="fixInCalendar"
                         :sync-badge="externalSyncBadges?.[subEntry.id] ?? null"
+                        :reserve-sync-indicator="reserveSyncIndicator"
                         :time-entry="subEntry"
                         @selected="emit('selected', [subEntry])"
                         @unselected="emit('unselected', [subEntry])"></TimeEntryRow>

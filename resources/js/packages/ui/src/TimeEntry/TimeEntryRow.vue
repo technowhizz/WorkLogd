@@ -66,6 +66,8 @@ const props = defineProps<{
     isReport?: boolean;
     /** Sync state against an external issue tracker, if the page tracks one. */
     syncBadge?: ExternalSyncBadge | null;
+    /** Hold the dot's space on rows without one, so descriptions line up down the list. */
+    reserveSyncIndicator?: boolean;
 }>();
 
 const emit = defineEmits<{ selected: []; unselected: [] }>();
@@ -165,6 +167,7 @@ async function handleDeleteTimeEntry() {
                             -->
                             <ExternalSyncIndicator
                                 :badge="syncBadge ?? null"
+                                :reserve-space="reserveSyncIndicator"
                                 class="ml-3.5 mr-0.5 shrink-0" />
                             <TimeEntryDescriptionInput
                                 v-if="!isBreak"
@@ -244,6 +247,7 @@ async function handleDeleteTimeEntry() {
                                 <!-- Mobile: nothing to its left, and the input's padding is pl-1.5 -->
                                 <ExternalSyncIndicator
                                     :badge="syncBadge ?? null"
+                                    :reserve-space="reserveSyncIndicator"
                                     class="ml-2 mr-0.5 shrink-0" />
                                 <TimeEntryDescriptionInput
                                     v-if="!isBreak"

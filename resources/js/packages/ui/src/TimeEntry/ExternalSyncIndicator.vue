@@ -9,6 +9,12 @@ const props = defineProps<{
      * competes with the description for room.
      */
     small?: boolean;
+    /**
+     * Hold the dot's space when there is no badge, so a list of rows lines up whether or not each
+     * one has a status. Only worth it where statuses are expected at all - somewhere with no
+     * tracker configured it would be an empty gutter on every row, forever.
+     */
+    reserveSpace?: boolean;
 }>();
 
 const classes = computed(() => {
@@ -38,6 +44,15 @@ const classes = computed(() => {
         :title="badge.label"
         :aria-label="badge.label"
         role="img"></span>
+    <!--
+        Same box, nothing in it. `invisible` rather than a bare div so it cannot be hovered or
+        read out, while still occupying the width the dots beside it do.
+    -->
+    <span
+        v-else-if="reserveSpace"
+        class="fc-sync-dot shrink-0 invisible"
+        :class="small ? 'fc-sync-dot-small' : ''"
+        aria-hidden="true"></span>
 </template>
 
 <style scoped>

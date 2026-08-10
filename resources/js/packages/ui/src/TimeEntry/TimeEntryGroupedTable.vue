@@ -48,6 +48,8 @@ const props = withDefaults(
         fixInCalendar?: (date: string) => void;
         /** Sync state per time entry id, when the page tracks one. */
         externalSyncBadges?: ExternalSyncBadges;
+        /** Hold the dot's space on rows without one, so descriptions line up down the list. */
+        reserveSyncIndicator?: boolean;
     }>(),
     {
         groupSimilarTimeEntries: true,
@@ -191,6 +193,7 @@ function unselectAllTimeEntries(value: TimeEntriesGroupedByType[]) {
             <template v-for="entry in value" :key="entry.id">
                 <TimeEntryAggregateRow
                     :external-sync-badges="externalSyncBadges"
+                    :reserve-sync-indicator="reserveSyncIndicator"
                     v-if="'timeEntries' in entry && entry.timeEntries.length > 1"
                     :create-project
                     :can-create-project
@@ -230,6 +233,7 @@ function unselectAllTimeEntries(value: TimeEntriesGroupedByType[]) {
                 <TimeEntryRow
                     v-else
                     :sync-badge="externalSyncBadges?.[entry.id] ?? null"
+                    :reserve-sync-indicator="reserveSyncIndicator"
                     :create-client
                     :enable-estimated-time
                     :can-create-project

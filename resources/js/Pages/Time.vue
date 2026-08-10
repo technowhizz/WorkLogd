@@ -69,7 +69,7 @@ const jiraRange = computed<{ start: string | null; end: string | null }>(() => {
 });
 const jiraStartDate = computed(() => jiraRange.value.start);
 const jiraEndDate = computed(() => jiraRange.value.end);
-const { externalSyncBadges } = useJiraIndicators(
+const { isJiraEnabled, externalSyncBadges } = useJiraIndicators(
     jiraStartDate,
     jiraEndDate,
     () => timeEntries.value
@@ -187,6 +187,7 @@ function goToCalendarDay(date: string) {
             :currency="getOrganizationCurrencyString()"
             :time-entries="timeEntries"
             :external-sync-badges="externalSyncBadges"
+            :reserve-sync-indicator="isJiraEnabled"
             :group-similar-time-entries="groupSimilarTimeEntriesSetting"
             :fix-in-calendar="goToCalendarDay"
             :tags="tags"></TimeEntryGroupedTable>
