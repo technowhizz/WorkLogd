@@ -3,7 +3,7 @@
  * This configuration is used by both the main solidtime app and the desktop app
  *
  * Note: fontFamily is intentionally omitted here as it differs between apps:
- * - Main app uses 'Inter'
+ * - Main app uses 'Archivo'
  * - Desktop app uses 'Outfit'
  * Each app should override the fontFamily in their own config.
  */

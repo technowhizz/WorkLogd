@@ -197,7 +197,7 @@ const option = computed(() => {
     <DashboardCard title="Activity Graph" :icon="BoltIcon">
         <div class="px-2">
             <div v-if="isLoading" class="flex justify-center items-center h-40">
-                <LoadingSpinner />
+                <LoadingSpinner :size="32" />
             </div>
             <div v-else-if="dailyHoursTracked" ref="chartContainer">
                 <v-chart

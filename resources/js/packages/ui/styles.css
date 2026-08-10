@@ -4,7 +4,7 @@
  * used by both the main solidtime app and the desktop app.
  *
  * Font-face declarations are intentionally omitted here as they differ between apps:
- * - Main app uses 'Inter'
+ * - Main app uses 'Archivo'
  * - Desktop app uses 'Outfit'
  * Each app should include their own font-face declarations.
  */
@@ -13,7 +13,94 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * WorkLog'd brand tokens. See brand/design-plan.md sections 4 and 5.
+ *
+ * Adapted to this app's theming: it switches on a `.dark` / `.light` class on <html>, applied
+ * before first paint by the inline script in app.blade.php. The brand pack keys off
+ * `[data-theme]` plus a prefers-color-scheme media query, neither of which this app sets - so
+ * the dark values live under `:root.dark` instead. Keying off the media query alone would be
+ * wrong here, since a user can choose light while their OS is dark.
+ *
+ * Ink and ground swap between modes. The wedge stays #EC3013 in both, because inside the logo
+ * it always sits on the light tile.
+ */
+:root {
+    --wl-ink: #201e1d;
+    --wl-ground: #f3f2f2;
+    --wl-muted: #57534e;
+
+    --wl-accent: #ec3013; /* Signal Red */
+    --wl-accent-text: #b8250e; /* accent at body-copy contrast */
+
+    /* Logo roles - the mark and wordmark read only these */
+    --wl-logo-tile: var(--wl-ink);
+    --wl-logo-rule: var(--wl-ground);
+    --wl-logo-wedge: #ec3013;
+    --wl-logo-text: var(--wl-ink);
+
+    /* Alternate palettes (accent / accent-text / dark-mode accent)
+       Cobalt        #1F4BD8 / #173BAA / #6E8CF5
+       Ledger Green  #12674A / #0E5139 / #2FA97C
+       Amber         #F0A30A / #A86F00 / #FFC24D
+       Mono          #78716C / #57534E / #A8A29E */
+
+    /*
+     * Two typefaces, deliberately: Archivo carries the brand voice on headings, figures and
+     * the wordmark; Inter carries interface density.
+     */
+    --wl-font: 'Archivo', system-ui, sans-serif;
+    --wl-font-display: 'Archivo', system-ui, sans-serif;
+    --wl-font-ui: 'Inter', system-ui, sans-serif;
+    --wl-rule: 2px;
+
+    /*
+     * Radius scale from ui-plan.md. The mark stays square - radius is a property of the app
+     * chrome, not of the logo. Nothing sits between these steps.
+     */
+    --wl-r-control: 10px; /* buttons, inputs, selects */
+    --wl-r-card: 12px; /* cards, tables, list groups */
+    --wl-r-panel: 16px; /* page panels, modals, sheets */
+    --wl-r-pill: 999px; /* chips, avatars, counts */
+    --wl-r-logo: 7px; /* logo tile at 24-40px only */
+
+    /* Light surfaces */
+    --wl-surface: #ffffff;
+    --wl-surface-2: #faf9f8;
+    --wl-border: #e7e4e2;
+    --wl-border-strong: #d9d5d2;
+    --wl-hover: #f6f5f4;
+    --wl-tint-accent: #fdeae7;
+
+    --wl-elev-1: 0 1px 2px rgba(32, 30, 29, 0.06);
+    --wl-elev-2:
+        0 1px 2px rgba(32, 30, 29, 0.06), 0 8px 24px rgba(32, 30, 29, 0.05);
+}
+
 :root.dark {
+    /* Brand tokens flipped for dark. The UI accent lifts one step so it holds against ink;
+       the logo wedge deliberately does not, since it sits on the light tile here. */
+    --wl-ink: #f3f2f2;
+    --wl-ground: #201e1d;
+    --wl-muted: #a8a29e;
+    --wl-accent: #ff5334;
+    --wl-accent-text: #ff8a73;
+    --wl-logo-tile: #f3f2f2;
+    --wl-logo-rule: #201e1d;
+    --wl-logo-wedge: #ec3013;
+    --wl-logo-text: #f3f2f2;
+
+    /* Dark surfaces, borders and elevation from ui-plan.md section 3. Dark mode carries
+       depth with borders rather than shadows. */
+    --wl-surface: #161826;
+    --wl-surface-2: #1a1c2c;
+    --wl-border: #2a2c3d;
+    --wl-border-strong: #34364d;
+    --wl-hover: #22243a;
+    --wl-tint-accent: rgba(236, 48, 19, 0.16);
+    --wl-elev-1: none;
+    --wl-elev-2: none;
+
     /* Linear/Raycast: cool blue-tinted neutrals, content surface at Material floor */
     --color-bg-primary: oklch(0.17 0 0);       /* content surface */
     --color-bg-secondary: oklch(0.20 0 0);     /* cards, input fills */
@@ -48,10 +135,12 @@
 
     --theme-color-ring: rgba(255, 255, 255, 0.5);
 
-    --theme-color-button-primary-background: rgba(var(--color-accent-300), 0.1);
-    --theme-color-button-primary-background-hover: rgba(var(--color-accent-300), 0.2);
-    --theme-color-button-primary-border: rgba(var(--color-accent-300), 0.2);
-    --theme-color-button-primary-text: var(--color-text-primary);
+    /* Same red fill as light. #FF5334 is accent *text* on ink, not a button fill - it is
+       only used here for the hover step. */
+    --theme-color-button-primary-background: #ec3013;
+    --theme-color-button-primary-background-hover: #ff5334;
+    --theme-color-button-primary-border: #ec3013;
+    --theme-color-button-primary-text: #ffffff;
 
     --theme-color-input-background: var(--color-bg-secondary);
 
@@ -65,18 +154,18 @@
 
 :root.light {
     --color-bg-primary: #ffffff;
-    --color-bg-secondary: #fcfcfc;
+    --color-bg-secondary: #faf9f8; /* brand raised surface */
     --color-bg-tertiary: #eeeeef;
     --color-bg-quaternary: #e1e1e3;
-    --color-bg-background: #f5f5f5;
-    --color-text-primary: #18181b;
-    --color-text-secondary: #3f3f46;
-    --color-text-tertiary: #57575c;
+    --color-bg-background: #f3f2f2; /* brand ground */
+    --color-text-primary: #201e1d; /* brand ink */
+    --color-text-secondary: #3f3d3b;
+    --color-text-tertiary: #57534e; /* brand muted */
     --color-text-quaternary: #a1a1aa;
-    --color-border-primary: #e7e7e7;
-    --color-border-secondary: #e5e5e5;
-    --color-border-tertiary: #dfdfdf;
-    --color-border-quaternary: #d1d1d1;
+    --color-border-primary: #e7e4e2; /* brand border */
+    --color-border-secondary: #e7e4e2;
+    --color-border-tertiary: #d9d5d2; /* brand border-strong */
+    --color-border-quaternary: #d9d5d2;
     --color-input-border-active: rgba(0, 0, 0, 0.3);
     --theme-color-menu-active: var(--color-bg-quaternary);
 
@@ -95,9 +184,11 @@
 
     --theme-color-ring: rgba(0, 0, 0, 0.7);
 
-    --theme-color-button-primary-background: rgba(var(--color-accent-600), 0.9);
-    --theme-color-button-primary-background-hover: rgba(var(--color-accent-600), 1);
-    --theme-color-button-primary-border: rgba(var(--color-accent-600), 1);
+    /* Signal Red fill, identical in both modes, so the brand red is literally the same
+       colour everywhere. Only the hover differs. */
+    --theme-color-button-primary-background: #ec3013;
+    --theme-color-button-primary-background-hover: #c8250c;
+    --theme-color-button-primary-border: #ec3013;
     --theme-color-button-primary-text: #ffffff;
 
     --theme-color-input-background: transparent;
@@ -107,7 +198,7 @@
 
     --color-accent-default: rgb(var(--color-accent-100));
     --color-accent-foreground: rgb(var(--color-accent-800));
-    --theme-color-default-background: #fcfcfc;
+    --theme-color-default-background: #f3f2f2; /* brand ground */
 }
 
 :root {
@@ -124,17 +215,22 @@
     --theme-color-row-separator-background: var(--theme-color-default-background-separator);
     --theme-color-row-border: var(--theme-color-card-border);
 
-    --color-accent-50: 240, 249, 255; /* sky-50 */
-    --color-accent-100: 224, 242, 254; /* sky-100 */
-    --color-accent-200: 186, 230, 253; /* sky-200 */
-    --color-accent-300: 125, 211, 252; /* sky-300 */
-    --color-accent-400: 56, 189, 248; /* sky-400 */
-    --color-accent-500: 14, 165, 233; /* sky-500 */
-    --color-accent-600: 2, 132, 199; /* sky-600 */
-    --color-accent-700: 3, 105, 161; /* sky-700 */
-    --color-accent-800: 7, 89, 133; /* sky-800 */
-    --color-accent-900: 12, 74, 110; /* sky-900 */
-    --color-accent-950: 8, 47, 73; /* sky-950 */
+    /*
+     * Signal Red. The brand defines two steps - the accent and a text-safe darkening - but the
+     * app's components expect a full 50-950 ramp, so the rest is interpolated around them.
+     * 500 is the accent exactly, 600 is the text-safe step exactly; do not drift those two.
+     */
+    --color-accent-50: 254, 242, 240;
+    --color-accent-100: 254, 226, 222;
+    --color-accent-200: 253, 199, 191;
+    --color-accent-300: 250, 160, 146;
+    --color-accent-400: 245, 106, 84;
+    --color-accent-500: 236, 48, 19; /* #EC3013 Signal Red */
+    --color-accent-600: 184, 37, 14; /* #B8250E text-safe */
+    --color-accent-700: 152, 30, 11;
+    --color-accent-800: 125, 26, 11;
+    --color-accent-900: 104, 24, 12;
+    --color-accent-950: 57, 10, 5;
 
     --theme-button-secondary-background: var(--theme-color-card-background);
     --theme-button-secondary-background-active: var(--theme-color-card-background-active);
@@ -185,7 +281,8 @@ body {
         --chart-3: var(--color-accent-600);
         --chart-4: var(--color-accent-700);
         --chart-5: var(--color-accent-800);
-        --radius: 0.5rem;
+        /* Control radius - the shadcn-derived components size off this one */
+        --radius: 0.625rem;
     }
     .dark {
         --background: var(--color-bg-background);
@@ -244,3 +341,44 @@ body {
             -4px 0px;
     }
 }
+
+/*
+ * WorkLog'd spinners, from brand/assets/spinner/spinner.css. Both loops are built from the
+ * logo's own two parts and the tile never moves, so the mark stays readable throughout.
+ * Kept here rather than imported so it goes through the same build as the rest of the theme.
+ */
+.wl-part{transform-box:view-box;transform-origin:48px 48px}
+
+/* Tally - strict hand-off, the tile is never empty */
+@keyframes wl-tally-wedge{
+  0%,6%{transform:translateY(0)}
+  22%,32%{transform:translateY(-58px)}
+  46%,100%{transform:translateY(0)}
+}
+@keyframes wl-tally-rule{
+  0%,52%{transform:translateX(0)}
+  68%,78%{transform:translateX(64px)}
+  92%,100%{transform:translateX(0)}
+}
+.wl-spin-tally .wl-wedge{animation:wl-tally-wedge 1.6s cubic-bezier(.65,0,.35,1) infinite}
+.wl-spin-tally .wl-rule{animation:wl-tally-rule 1.6s cubic-bezier(.65,0,.35,1) infinite}
+
+/* Count - the rule fills like a progress bar, the wedge ticks once per pass */
+@keyframes wl-count-rule{
+  0%{transform:scaleX(.06)}
+  60%{transform:scaleX(1)}
+  76%{transform:scaleX(1)}
+  100%{transform:scaleX(.06)}
+}
+@keyframes wl-count-wedge{
+  0%,10%{transform:translateY(0) scaleY(1)}
+  24%{transform:translateY(-10px) scaleY(.82)}
+  40%,100%{transform:translateY(0) scaleY(1)}
+}
+.wl-spin-count .wl-wedge{transform-origin:48px 52px;animation:wl-count-wedge 1.5s cubic-bezier(.34,1.3,.64,1) infinite}
+.wl-spin-count .wl-rule{transform-origin:34px 69px;animation:wl-count-rule 1.5s cubic-bezier(.65,0,.35,1) infinite}
+/* small cut (under 20px) shifts the origins with the geometry */
+.wl-spin-count.wl-sm .wl-wedge{transform-origin:48px 54px}
+.wl-spin-count.wl-sm .wl-rule{transform-origin:32px 73px}
+
+@media (prefers-reduced-motion: reduce){.wl-part{animation:none !important}}

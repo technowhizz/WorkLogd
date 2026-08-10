@@ -7,15 +7,27 @@
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
         <!-- Favicons -->
-        <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png">
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicons/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicons/favicon-16x16.png">
-        <link rel="manifest" href="/favicons/site.webmanifest">
-        <link rel="mask-icon" href="/favicons/safari-pinned-tab.svg" color="#000000">
-        <link rel="shortcut icon" href="/favicons/favicon.ico">
-        <meta name="msapplication-TileColor" content="#000000">
-        <meta name="msapplication-config" content="/favicons/browserconfig.xml">
-        <meta name="theme-color" content="#000000">
+        {{--
+            mark-adaptive.svg carries its own prefers-color-scheme block, so one file serves
+            both modes wherever CSS cannot reach. The PNGs are the fallback for user agents
+            that will not take an SVG icon, and those do need an explicit pair.
+        --}}
+        <link rel="icon" type="image/svg+xml" href="/brand/svg/mark-adaptive.svg">
+        <link rel="icon" type="image/png" sizes="32x32" href="/brand/png/light/favicon-32.png">
+        <link rel="icon" type="image/png" sizes="32x32" href="/brand/png/dark/favicon-32.png" media="(prefers-color-scheme: dark)">
+        {{-- Ink tile in both modes: iOS renders it on its own background --}}
+        <link rel="apple-touch-icon" sizes="180x180" href="/brand/png/light/apple-touch-icon-180.png">
+        <link rel="manifest" href="/brand/site.webmanifest">
+        <link rel="shortcut icon" href="/brand/favicon.ico">
+        <meta name="msapplication-TileColor" content="#201E1D">
+        <meta name="msapplication-config" content="/brand/browserconfig.xml">
+        <meta name="theme-color" content="#F3F2F2" media="(prefers-color-scheme: light)">
+        <meta name="theme-color" content="#201E1D" media="(prefers-color-scheme: dark)">
+
+        <!-- Archivo is the brand typeface, weights 400/700/800 -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;700;800&display=swap" rel="stylesheet">
 
         {{--
             Apply the stored theme before the first paint. The Vue app only sets this class once

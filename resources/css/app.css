@@ -1,7 +1,10 @@
-/* Import shared solidtime styles from UI package */
+/* Import the shared styles from the UI package */
 @import '../js/packages/ui/styles.css';
 
-/* Main app specific styles - Inter font */
+/*
+ * Two faces, per the brand's type roles: Inter for interface text, Archivo for headings,
+ * figures and the wordmark.
+ */
 @font-face {
     font-family: 'Inter';
     src:
@@ -11,4 +14,12 @@
     font-style: normal;
     font-display: swap;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+@font-face {
+    font-family: 'Archivo';
+    src: url('/fonts/ArchivoVariable.woff2') format('woff2');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
 }
