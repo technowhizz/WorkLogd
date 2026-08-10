@@ -5,10 +5,10 @@
 {{ __('Your currently running time entry ":description" is now running for more than 8 hours!', ['description' => $timeEntry->description]) }}
 @endif
 
-{{ __('If you forgot to stop the Time Tracker, you can do so in solidtime:') }}
+{{ __('If you forgot to stop the Time Tracker, you can do so in :app:', ['app' => config('app.name')]) }}
 
 @component('mail::button', ['url' => $dashboardUrl])
-{{ __('Go to solidtime') }}
+{{ __('Go to :app', ['app' => config('app.name')]) }}
 @endcomponent
 
 @endcomponent

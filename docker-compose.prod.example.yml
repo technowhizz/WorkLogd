@@ -20,7 +20,7 @@
 # runs jobs inline and blocks the HTTP request instead.
 
 x-app-env: &app-env
-    APP_NAME: solidtime
+    APP_NAME: "WorkLog'd"
     APP_ENV: production
     APP_DEBUG: 'false'
     # APP_KEY comes from solidtime.prod.env
@@ -57,7 +57,7 @@ x-app-env: &app-env
     MAIL_USERNAME: 'CHANGE_ME'
     MAIL_PASSWORD: 'CHANGE_ME'
     MAIL_FROM_ADDRESS: 'no-reply@example.com'
-    MAIL_FROM_NAME: solidtime
+    MAIL_FROM_NAME: "WorkLog'd"
 
     # Local disk keeps this stack to four services. Swap to s3 with the S3_* variables if you
     # would rather not manage the volume, ex. for profile photos and report exports.
@@ -76,7 +76,7 @@ x-app-env: &app-env
 
 services:
     app:
-        image: ghcr.io/technowhizz/solidtime:latest
+        image: ghcr.io/technowhizz/worklogd:latest
         restart: unless-stopped
         env_file:
             - solidtime.prod.env
@@ -99,7 +99,7 @@ services:
                 condition: service_healthy
 
     worker:
-        image: ghcr.io/technowhizz/solidtime:latest
+        image: ghcr.io/technowhizz/worklogd:latest
         restart: unless-stopped
         env_file:
             - solidtime.prod.env
@@ -128,7 +128,7 @@ services:
                 condition: service_healthy
 
     scheduler:
-        image: ghcr.io/technowhizz/solidtime:latest
+        image: ghcr.io/technowhizz/worklogd:latest
         restart: unless-stopped
         env_file:
             - solidtime.prod.env

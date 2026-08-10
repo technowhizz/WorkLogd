@@ -24,7 +24,7 @@ concurrency:
     cancel-in-progress: true
 
 env:
-    DOCKER_REPO: "ghcr.io/${{ github.repository_owner }}/solidtime"
+    DOCKER_REPO: "ghcr.io/${{ github.repository_owner }}/worklogd"
 
 jobs:
     build:

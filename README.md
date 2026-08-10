@@ -1,13 +1,13 @@
-# solidtime - The modern Open-Source TimeTracker
+# WorkLog'd
 
-[![GitHub License](https://img.shields.io/github/license/solidtime-io/solidtime?style=flat-square)](https://github.com/solidtime-io/solidtime/blob/main/LICENSE.md)
-[![Codecov](https://img.shields.io/codecov/c/github/solidtime-io/solidtime?style=flat-square&logo=codecov)](https://codecov.io/gh/solidtime-io/solidtime)
-![GitHub Actions Unit Tests Status](https://img.shields.io/github/actions/workflow/status/solidtime-io/solidtime/phpunit.yml?style=flat-square)
 ![PHPStan badge](https://img.shields.io/badge/PHPStan-Level_7-blue?style=flat-square&color=blue)
 
-![Screenshot of the solidtime application with header: solidtime - The modern Open-Source Time Tracker](docs/solidtime-banner.png "solidtime Banner")
+WorkLog'd is a modern time tracker for freelancers and agencies, with first-class submission of
+your tracked time to Jira.
 
-solidtime is a modern open-source time tracking application for Freelancers and Agencies.
+It is a fork of [solidtime](https://github.com/solidtime-io/solidtime), which it tracks for
+upstream fixes and features. Everything solidtime does, this does; see
+[what this fork adds](#what-this-fork-adds) for the rest.
 
 ## Features
 
@@ -20,10 +20,9 @@ solidtime is a modern open-source time tracking application for Freelancers and 
  - Roles and permissions: Create and manage organizations
  - Import: Import your time tracking data from other time tracking applications (Supported: Toggl, Clockify, Timeentry CSV)
 
-## Additions in this fork
+## What this fork adds
 
-This fork tracks [solidtime-io/solidtime](https://github.com/solidtime-io/solidtime) and adds the
-following. Everything else behaves as upstream.
+Everything else behaves as upstream solidtime.
 
 ### Integrations
 
@@ -83,14 +82,8 @@ following. Everything else behaves as upstream.
 
 ## Self Hosting
 
-If you are looking into self-hosting solidtime, you can find the guides [here](https://docs.solidtime.io/self-hosting/intro)
-
-We also have an examples repository [here](https://github.com/solidtime-io/self-hosting-examples)
-
-If you do not want to self-host solidtime or try it out you can sign up for [solidtime cloud](https://www.solidtime.io/)
-
 This fork ships its own example stack, built around the images published to
-`ghcr.io/technowhizz/solidtime`:
+`ghcr.io/technowhizz/worklogd` on every push to `main`.
 
 ```bash
 cp docker-compose.prod.example.yml docker-compose.prod.yml
@@ -102,8 +95,15 @@ docker compose -f docker-compose.prod.yml up -d
 `generate-secrets.sh` produces every value that is yours to invent - `APP_KEY`, the database
 password, the Passport signing keys and the personal access client credentials - and prints the one
 command to run after the first boot, which creates the `oauth_clients` row those credentials refer
-to. Keep `solidtime.prod.env`: `APP_KEY` decrypts the stored Jira and Google tokens, and the
-Passport keys sign every API token in circulation, so regenerating them is not recoverable.
+to. Keep that env file: `APP_KEY` decrypts the stored Jira and Google tokens, and the Passport keys
+sign every API token in circulation, so regenerating them is not recoverable.
+
+Note the **queue worker is not optional here**. A Jira sync runs as a queued job, so without one the
+sync dialog waits forever. That also means the cache must be shared between containers rather than
+the default `file` driver.
+
+solidtime's [self-hosting guides](https://docs.solidtime.io/self-hosting/intro) still apply to
+everything this fork has not changed.
 
 ### Google Calendar integration (optional)
 
@@ -116,7 +116,7 @@ about it is shown to your users.
    `https://<your-host>/integrations/google-calendar/callback` as an authorised redirect URI.
 3. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in your `.env`.
 
-Users then connect their own Google account under *Profile Settings*. solidtime requests read-only
+Users then connect their own Google account under *Profile Settings*. WorkLog'd requests read-only
 access to calendar events plus the account's email address, and stores only the OAuth tokens
 (encrypted) - event titles and times are fetched from Google per request and never persisted.
 
@@ -157,20 +157,11 @@ with the default `sync` it runs inline and blocks the request until it finishes.
 
 ## Issues & Feature Requests
 
-If you find any **bugs in solidtime**, please feel free to [**open an issue**](https://github.com/solidtime-io/solidtime/issues/new) in this repository, with instructions on how to reproduce the bug. 
-If you have a **feature request**, please [**create a discussion**](https://github.com/solidtime-io/solidtime/discussions/new?category=feature-requests) in this repository.
+Please [open an issue](https://github.com/technowhizz/solidtime/issues/new) on this repository.
 
-## Contributing
-
-Please open an issue or start a discussion and wait for approval before submitting a pull request. This does not apply to tiny fixes or changes however, please keep in mind that we might not merge PRs for various reasons. 
-
-**If you submit an AI slop pull request (especially without following the proper procedure), you will be banned from future contributions to solidtime.**
-
-To keep that manageable, pull requests from authors who are not vouched are closed automatically, unless they change 50 lines or fewer. To get vouched, open an issue or discussion first and explain how you intend to implement the change. Once we have agreed on the approach, we vouch for you. See [Vouched contributors](./CONTRIBUTING.md#vouched-contributors).
-
-Please read the [CONTRIBUTING.md](./CONTRIBUTING.md) before sumbitting a Pull Request.
-
-We do accept contributions in the [documentation repository](https://github.com/solidtime-io/docs) f.e. to add new self-hosting guides.
+Bugs that also reproduce on upstream solidtime are better reported
+[there](https://github.com/solidtime-io/solidtime/issues/new) so everyone benefits - this fork
+will pick up the fix when it merges upstream.
 
 ## Security
 
@@ -179,3 +170,7 @@ Looking to report a vulnerability? Please refer our [SECURITY.md](./SECURITY.md)
 ## License
 
 This project is open-source and available under the GNU Affero General Public License v3.0 (AGPL v3). Please see the [license file](LICENSE.md) for more information.
+
+It is derived from [solidtime](https://github.com/solidtime-io/solidtime), copyright the solidtime
+authors, and remains under the same licence. The WorkLog'd name and marks are not part of that
+grant.

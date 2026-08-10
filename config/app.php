@@ -30,7 +30,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'solidtime'),
+    'name' => env('APP_NAME', 'WorkLog\'d'),
 
     'version' => env('APP_VERSION'),
 
