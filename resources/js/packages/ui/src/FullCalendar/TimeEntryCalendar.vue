@@ -53,6 +53,8 @@ import { useCalendarGrid } from './useCalendarGrid';
 import { useCalendarZoom } from './useCalendarZoom';
 import { useCalendarNavigation } from './useCalendarNavigation';
 import { useCalendarEvents } from './useCalendarEvents';
+import { getChipColors } from './eventColors';
+import { getNoProjectColor } from '../utils/settings';
 import { useActivityBoxes } from './useActivityBoxes';
 import { useExternalEventBoxes } from './useExternalEventBoxes';
 import { useEventDrag } from './useEventDrag';
@@ -327,6 +329,16 @@ const selectionRangeLabel = computed(() => {
  * otherwise the single selected day. Intermediate full-height columns never get them.
  */
 const selectionLabelDay = computed(() => selectionEndDay.value ?? selectionDay.value);
+
+/*
+ * The ghost wears the colors of the entry the drag is about to create, which has no project
+ * yet — so it follows the user's "no project" color rather than the accent, and picking a new
+ * one changes the ghost with it. Same recipe as a rendered chip, so what you drag out is what
+ * you get.
+ */
+const selectionColors = computed(() =>
+    getChipColors(getNoProjectColor(), cssBackground.value?.trim() ?? '')
+);
 
 const {
     contextMenuTimeEntry,
@@ -820,6 +832,10 @@ function getEventDurationSeconds(dayEvent: DayEvent, dayStr: string): number {
                                             "
                                             :selection-range-label="selectionRangeLabel"
                                             :selection-duration-label="selectionDurationLabel"
+                                            :selection-background-color="
+                                                selectionColors.backgroundColor
+                                            "
+                                            :selection-border-color="selectionColors.borderColor"
                                             @activity-pointerdown="guardedSlotPointerDown"
                                             @external-event-copy="copyExternalEventToTimeEntry"
                                             @event-pointerdown="

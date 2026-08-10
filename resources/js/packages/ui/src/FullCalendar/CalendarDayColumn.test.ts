@@ -8,6 +8,10 @@ import type { TimeEntry } from '@/packages/api/src';
 
 const DAY = '2026-07-14';
 
+/** Stand-ins for what the calendar derives from the user's "no project" color. */
+const SELECTION_BACKGROUND = '#dcdee1';
+const SELECTION_BORDER = '#b5b9bf';
+
 /*
  * The event block is wrapped in a Reka `TooltipTrigger as-child`, which clones the vnode and
  * merges props onto it. These tests pin the two things that would silently break if that
@@ -45,7 +49,7 @@ function dayEvent(): DayEvent {
     };
 }
 
-function mountColumn() {
+function mountColumn(overrides: Record<string, unknown> = {}) {
     return mount(CalendarDayColumn, {
         props: {
             dayStr: DAY,
@@ -89,6 +93,9 @@ function mountColumn() {
             showSelectionLabels: false,
             selectionRangeLabel: null,
             selectionDurationLabel: null,
+            selectionBackgroundColor: SELECTION_BACKGROUND,
+            selectionBorderColor: SELECTION_BORDER,
+            ...overrides,
         },
         global: {
             provide: {
@@ -135,5 +142,46 @@ describe('CalendarDayColumn event blocks', () => {
 
         expect(wrapper.emitted('resizer-pointerdown')).toHaveLength(1);
         expect(wrapper.emitted('event-pointerdown')).toBeUndefined();
+    });
+});
+
+/*
+ * The ghost is colored by the parent so it matches the entry the drag will create. The
+ * stylesheet reads those two custom properties, so a ghost that drops them silently reverts to
+ * an uncolored box — assert they reach every ghost box, including the cross-day ones.
+ */
+describe('CalendarDayColumn selection ghost', () => {
+    it('carries the selection colors on the single-day ghost', () => {
+        const wrapper = mountColumn({
+            showSelection: true,
+            isSelectionStart: true,
+            selectionTop: 100,
+            selectionHeight: 50,
+        });
+
+        const style = wrapper.get('.fc-selection-ghost').attributes('style');
+        expect(style).toContain(`--fc-selection-bg: ${SELECTION_BACKGROUND}`);
+        expect(style).toContain(`--fc-selection-border: ${SELECTION_BORDER}`);
+    });
+
+    it('carries them on the intermediate and end ghosts of a cross-day selection', () => {
+        const wrapper = mountColumn({
+            showSelection: true,
+            isSelectionIntermediate: true,
+            isSelectionEnd: true,
+            selectionEndTop: 0,
+            selectionEndHeight: 200,
+        });
+
+        const ghosts = wrapper.findAll('.fc-selection-ghost');
+        expect(ghosts).toHaveLength(2);
+        ghosts.forEach((ghost) => {
+            expect(ghost.attributes('style')).toContain(
+                `--fc-selection-bg: ${SELECTION_BACKGROUND}`
+            );
+            expect(ghost.attributes('style')).toContain(
+                `--fc-selection-border: ${SELECTION_BORDER}`
+            );
+        });
     });
 });

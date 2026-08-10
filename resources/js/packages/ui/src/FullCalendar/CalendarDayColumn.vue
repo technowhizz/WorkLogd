@@ -71,7 +71,20 @@ const props = defineProps<{
     showSelectionLabels: boolean;
     selectionRangeLabel: string | null;
     selectionDurationLabel: string | null;
+    /** Colors of the entry the selection will become — see `selectionColors` in the calendar. */
+    selectionBackgroundColor: string;
+    selectionBorderColor: string;
 }>();
+
+/**
+ * Handed to the ghosts as custom properties rather than inline `background-color` /
+ * `border-color`, so the scoped stylesheet keeps ownership of *how* translucent the ghost is
+ * while the parent only says *which* color it is.
+ */
+const selectionColorStyle = computed<Record<string, string>>(() => ({
+    '--fc-selection-bg': props.selectionBackgroundColor,
+    '--fc-selection-border': props.selectionBorderColor,
+}));
 
 /**
  * The activity gutter on the left and the external calendar lane on the right each push
@@ -334,22 +347,25 @@ const emit = defineEmits<{
 
         <div
             v-if="showSelection && isSelectionStart"
-            class="fc-selection-ghost absolute inset-x-0 pointer-events-none border border-primary z-[2]"
+            class="fc-selection-ghost absolute inset-x-0 pointer-events-none rounded-sm border z-[2]"
             :style="{
+                ...selectionColorStyle,
                 top: selectionTop + 'px',
                 height: selectionHeight + 'px',
             }"></div>
         <div
             v-if="showSelection && isSelectionIntermediate"
-            class="fc-selection-ghost absolute inset-x-0 pointer-events-none border border-primary z-[2]"
+            class="fc-selection-ghost absolute inset-x-0 pointer-events-none rounded-sm border z-[2]"
             :style="{
+                ...selectionColorStyle,
                 top: '0px',
                 height: totalGridHeight + 'px',
             }"></div>
         <div
             v-if="showSelection && isSelectionEnd"
-            class="fc-selection-ghost absolute inset-x-0 pointer-events-none border border-primary z-[2]"
+            class="fc-selection-ghost absolute inset-x-0 pointer-events-none rounded-sm border z-[2]"
             :style="{
+                ...selectionColorStyle,
                 top: selectionEndTop + 'px',
                 height: selectionEndHeight + 'px',
             }"></div>
@@ -388,12 +404,16 @@ const emit = defineEmits<{
 
 <style scoped>
 /*
- * Translucent so entries the drag passes over stay visible underneath — the ghost sits above
- * them at z-index 2. Mixed rather than set with a Tailwind alpha modifier because `accent`
- * maps to a bare `var(--accent)` in tailwind.theme.js, which `bg-accent/55` cannot pierce.
+ * Colored like the entry the drag will create, so the ghost previews the result instead of
+ * reading as a generic accent-tinted marquee.
+ *
+ * Still translucent — the ghost sits above the entries at z-index 2 and a drag passing over one
+ * should not blank it out — but far less so than the 55% it started at, where the box was so
+ * faint against the grid that it barely registered as an object.
  */
 .fc-selection-ghost {
-    background-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    background-color: color-mix(in srgb, var(--fc-selection-bg) 72%, transparent);
+    border-color: var(--fc-selection-border);
 }
 
 /* Query target for the compact layouts below — an element cannot query itself. */

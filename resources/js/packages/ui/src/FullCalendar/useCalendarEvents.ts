@@ -1,16 +1,18 @@
 import { computed, ref, type Ref, type ComputedRef } from 'vue';
-import chroma from 'chroma-js';
 import type { Dayjs } from 'dayjs';
 import type { TimeEntry, Project, Client, Task } from '@/packages/api/src';
 import { getBreakPlacementHint } from '../utils/breakPlacement';
-import { flattenColor } from '../utils/color';
 import { getNoProjectColor } from '../utils/settings';
 import { getDayJsInstance, getLocalizedDayJs } from '../utils/time';
 import type { CalendarSettings } from './calendarSettings';
 import type { CalendarEvent, DayEvent } from './calendarTypes';
+import {
+    BREAK_BACKGROUND_MIX,
+    BREAK_COLOR,
+    EVENT_BACKGROUND_MIX,
+    getChipColors,
+} from './eventColors';
 import { layoutDayEvents } from './eventLayout';
-
-const BREAK_COLOR = '#f59e0b';
 
 export function useCalendarEvents(params: {
     timeEntries: () => TimeEntry[];
@@ -55,19 +57,11 @@ export function useCalendarEvents(params: {
             } else {
                 title = timeEntry.description || 'No description';
             }
-            // Alpha means "washed out", not "translucent": the chip is already a mix toward the
-            // theme background, so passing an eight digit hex straight into chroma would emit an
-            // eight digit result and let the grid lines show through wherever chips stack.
-            // Compositing onto the background first honours the alpha and keeps the chip opaque,
-            // and is the identity for a fully opaque color, so nothing changes for existing data.
-            const baseColor = flattenColor(
+            const { backgroundColor, borderColor } = getChipColors(
                 isBreak ? BREAK_COLOR : project?.color || noProjectColor,
-                themeBackground
+                themeBackground,
+                isBreak ? BREAK_BACKGROUND_MIX : EVENT_BACKGROUND_MIX
             );
-            const backgroundColor = chroma
-                .mix(baseColor, themeBackground, isBreak ? 0.75 : 0.65, 'lab')
-                .hex();
-            const borderColor = chroma.mix(baseColor, themeBackground, 0.5, 'lab').hex();
 
             const startTime = getLocalizedDayJs(timeEntry.start);
             const endTime = isRunning
