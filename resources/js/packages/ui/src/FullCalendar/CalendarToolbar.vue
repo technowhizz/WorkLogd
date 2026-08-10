@@ -5,6 +5,12 @@ import { Tabs, TabsList } from '../tabs';
 import TabBarItem from '../TabBar/TabBarItem.vue';
 import CalendarSettingsPopover from './CalendarSettingsPopover.vue';
 import type { CalendarSettings } from './calendarSettings';
+import { TIME_AXIS_WIDTH } from './calendarTypes';
+
+/** The `px-2` on the toolbar, which the first column's offset is measured from. */
+const CONTAINER_PADDING = 8;
+/** The grid sits inside the calendar's 1px border, so its columns start one pixel further in. */
+const CALENDAR_BORDER = 1;
 
 defineProps<{
     viewTitle: string;
@@ -27,8 +33,16 @@ const emit = defineEmits<{
 
 <template>
     <div class="flex items-center justify-between bg-default-background px-2 py-1.5">
-        <!-- Left: Navigation -->
-        <div class="flex items-center gap-1">
+        <!--
+            Left: navigation, lined up with the first day column rather than the calendar's own
+            edge, so the controls start where the grid does. Driven by the axis width itself, so
+            the two cannot drift apart - the px-2 already on the container is taken off it.
+        -->
+        <div
+            class="flex items-center gap-2"
+            :style="{
+                paddingLeft: TIME_AXIS_WIDTH - CONTAINER_PADDING + CALENDAR_BORDER + 'px',
+            }">
             <Button
                 variant="outline"
                 size="sm"
@@ -47,8 +61,9 @@ const emit = defineEmits<{
             </Button>
             <Button variant="outline" size="sm" @click="emit('today')"> today </Button>
 
-            <!-- Vertical zoom: each step shows one hour more or less -->
-            <div class="flex items-center gap-1 ml-1">
+            <!-- Vertical zoom: each step shows one hour more or less. Set apart from the paging
+                 controls, since it does something else entirely. -->
+            <div class="flex items-center gap-2 ml-3">
                 <Button
                     variant="outline"
                     size="sm"
