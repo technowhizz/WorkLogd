@@ -170,7 +170,7 @@ function onSelectChange(checked: boolean) {
                                 </GroupedItemsCountButton>
                                 <ExternalSyncIndicator
                                     :badge="aggregateSyncBadge"
-                                    class="mr-2 shrink-0" />
+                                    class="mx-2 shrink-0" />
                                 <TimeEntryDescriptionInput
                                     v-if="timeEntry.type !== 'break'"
                                     class="min-w-0 mr-4 shrink"
@@ -280,7 +280,7 @@ function onSelectChange(checked: boolean) {
                                     </GroupedItemsCountButton>
                                     <ExternalSyncIndicator
                                         :badge="aggregateSyncBadge"
-                                        class="mr-2 shrink-0" />
+                                        class="mx-2 shrink-0" />
                                     <TimeEntryDescriptionInput
                                         class="min-w-0 flex-1"
                                         :model-value="timeEntry.description"

@@ -159,7 +159,7 @@ async function handleDeleteTimeEntry() {
                             <div v-if="indent === true" class="w-10 h-7"></div>
                             <ExternalSyncIndicator
                                 :badge="syncBadge ?? null"
-                                class="mr-2 shrink-0" />
+                                class="mx-2 shrink-0" />
                             <TimeEntryDescriptionInput
                                 v-if="!isBreak"
                                 class="min-w-0 mr-4 shrink"
@@ -237,7 +237,7 @@ async function handleDeleteTimeEntry() {
                             <div class="flex items-center justify-between min-w-0">
                                 <ExternalSyncIndicator
                                     :badge="syncBadge ?? null"
-                                    class="mr-2 shrink-0" />
+                                    class="mx-2 shrink-0" />
                                 <TimeEntryDescriptionInput
                                     v-if="!isBreak"
                                     class="min-w-0 flex-1"
