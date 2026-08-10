@@ -1,5 +1,6 @@
 import { PLAYWRIGHT_BASE_URL } from '../playwright/config';
 import { test } from '../playwright/fixtures';
+import { localTimeOf } from './utils/dates';
 import { expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import {
@@ -13,6 +14,7 @@ import {
     createProjectViaApi,
     createBillableProjectViaApi,
     createBareTimeEntryViaApi,
+    createTimeEntryAtLocalHourViaApi,
     createTimeEntryViaApi,
     updateOrganizationCurrencyViaWeb,
     updateOrganizationSettingViaApi,
@@ -37,6 +39,14 @@ function getDayFromTimestamp(timestamp: string): number {
  */
 function getMonthFromTimestamp(timestamp: string): number {
     return new Date(timestamp).getUTCMonth() + 1;
+}
+
+/**
+ * Extracts the hour an ISO timestamp is rendered at in the user's timezone, which
+ * is the timezone the browser (and therefore the runner) reports.
+ */
+function getLocalHourFromTimestamp(timestamp: string): number {
+    return new Date(timestamp).getHours();
 }
 
 async function goToProfilePage(page: Page) {
@@ -208,30 +218,40 @@ test('test that adding a new tag to an existing time entry works', async ({ page
 // Test that Start / End Time Update Works
 test('test that updating a the start of an existing time entry in the overview works on enter', async ({
     page,
+    ctx,
 }) => {
+    // The entry is pinned to a fixed hour in the user's timezone instead of being
+    // recorded at "now": the absolute start typed below has to stay before the entry's
+    // end, and the API rejects an update where it does not. Timing it off the wall
+    // clock made this fail for any run started between midnight and 01:00.
+    await createTimeEntryAtLocalHourViaApi(ctx, {
+        startHour: 12,
+        durationSeconds: 60 * 60,
+        description: 'Start update test',
+    });
     await goToTimeOverview(page);
-    const timeEntryRows = page.locator('[data-testid="time_entry_row"]');
-    await createEmptyTimeEntry(page);
 
+    const timeEntryRows = page.locator('[data-testid="time_entry_row"]');
     const newTimeEntry = timeEntryRows.first();
     await assertThatTimeEntryRowIsStopped(newTimeEntry);
     const timeEntryRangeElement = newTimeEntry.getByTestId('time_entry_range_selector');
-    await expect(timeEntryRangeElement).toBeVisible();
+    await expect(timeEntryRangeElement).toHaveText('12:00 - 13:00');
     await timeEntryRangeElement.click();
-    await page.getByTestId('time_entry_range_start').first().fill('1');
-    await Promise.all([
-        page.waitForResponse(async (response) => {
-            return (
+    await page.getByTestId('time_entry_range_start').first().fill('9');
+    const [updateResponse] = await Promise.all([
+        page.waitForResponse(
+            async (response) =>
                 response.status() === 200 &&
-                (await response.headerValue('Content-Type')) === 'application/json' &&
-                (await response.json()).data.id !== null &&
-                // TODO! Actually check the value
-                (await response.json()).data.start !== null &&
-                (await response.json()).data.end !== null
-            );
-        }),
+                response.request().method() === 'PUT' &&
+                (await response.headerValue('Content-Type')) === 'application/json'
+        ),
         page.getByTestId('time_entry_range_end').press('Enter'),
     ]);
+
+    const { data } = await updateResponse.json();
+    expect(data.id).not.toBeNull();
+    expect(data.end).not.toBeNull();
+    expect(getLocalHourFromTimestamp(data.start)).toBe(9);
 });
 
 test('test that updating a the duration in the overview works on blur', async ({ page }) => {
@@ -1677,8 +1697,9 @@ test('test that start time picker works in create modal', async ({ page }) => {
         page.getByRole('button', { name: 'Create Time Entry' }).click(),
     ]);
     const createBody = await createResponse.json();
-    // The start time should contain 09:30 in the timestamp
-    expect(createBody.data.start).toMatch(/09:30/);
+    // The picker sets a local wall-clock time and the API stores the UTC instant, so compare in
+    // local terms - matching '09:30' inside the stored string only holds at UTC+0.
+    expect(localTimeOf(new Date(createBody.data.start))).toBe('09:30');
 });
 
 test('test that end time picker works in create modal', async ({ page }) => {

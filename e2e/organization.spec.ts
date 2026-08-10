@@ -7,7 +7,16 @@ async function goToOrganizationSettings(page) {
     await page.getByRole('menuitem', { name: 'Organization Settings' }).click();
 }
 
-async function createTimeEntry(page, duration: string) {
+/**
+ * Renders a UTC timestamp the way the time overview groups entries by day: as
+ * DD/MM/YYYY in the user's timezone.
+ */
+function formatDayHeading(timestamp: string): string {
+    return new Date(timestamp).toLocaleDateString('en-GB');
+}
+
+/** Creates a time entry through the manual entry modal and returns its UTC start. */
+async function createTimeEntry(page, duration: string): Promise<string> {
     await page.goto(PLAYWRIGHT_BASE_URL + '/time');
 
     // Open the dropdown menu and click "Manual time entry"
@@ -22,7 +31,7 @@ async function createTimeEntry(page, duration: string) {
     await page.locator('[role="dialog"] input[name="Duration"]').press('Tab');
 
     // Submit the time entry
-    await Promise.all([
+    const [, response] = await Promise.all([
         page.getByRole('button', { name: 'Create Time Entry' }).click(),
         page.waitForResponse(
             async (response) =>
@@ -31,6 +40,8 @@ async function createTimeEntry(page, duration: string) {
                 response.status() === 201
         ),
     ]);
+
+    return (await response.json()).data.start as string;
 }
 
 test('test that organization name can be updated', async ({ page }) => {
@@ -247,7 +258,7 @@ test('test that format settings are reflected in the dashboard', async ({ page }
         ),
     ]);
 
-    await createTimeEntry(page, '00:00');
+    const timeEntryStart = await createTimeEntry(page, '00:00');
 
     // Go to dashboard and check the formats
     await page.goto(PLAYWRIGHT_BASE_URL + '/dashboard');
@@ -260,14 +271,17 @@ test('test that format settings are reflected in the dashboard', async ({ page }
     // check that 0h 00min is not displayed
     await expect(page.getByText('0h 00min', { exact: true }).nth(0)).not.toBeVisible();
 
-    // check that the current date is displayed in the dd/mm/yyyy format on the time page
+    // check that the entry's date is displayed in the dd/mm/yyyy format on the time page.
+    // The manual entry modal defaults to "an hour ago until now", so the entry lands on
+    // the previous day for any run started between midnight and 01:00 — assert against
+    // the date the entry actually starts on rather than today's.
     await page.goto(PLAYWRIGHT_BASE_URL + '/time');
     // Wait for time entries to load so organization data is available for date formatting
     await page.waitForResponse(
         (response) => response.url().includes('/time-entries') && response.status() === 200
     );
     await expect(
-        page.getByText(new Date().toLocaleDateString('en-GB'), { exact: true }).nth(0)
+        page.getByText(formatDayHeading(timeEntryStart), { exact: true }).nth(0)
     ).toBeVisible({ timeout: 10000 });
 });
 
