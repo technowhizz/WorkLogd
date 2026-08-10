@@ -14,12 +14,12 @@ class JiraSyncItemDto
     /**
      * @param  int|null  $previousDurationSeconds  What Jira currently holds, for an update
      * @param  list<string>  $timeEntryIds  Empty for a delete - its entries are gone
-     * @param  string|null  $previousGroupHash  Set when this update took over a worklog that was
-     *                                          stored under a different hash, because the
-     *                                          description changed. The row keyed by it has to be
-     *                                          dropped as this one is written, or the next sync
-     *                                          finds an orphan pointing at the same Jira worklog
-     *                                          and deletes what was just updated.
+     * @param  string|null  $worklogRowId  Primary key of the jira_worklogs row this item matched,
+     *                                     so an update rewrites that exact row - hash, date and
+     *                                     comment included - instead of dancing between hash keys.
+     *                                     Null for a create. Internal: deliberately absent from
+     *                                     toArray(), which feeds the preview dialog and the
+     *                                     hand-maintained API client.
      */
     public function __construct(
         public readonly JiraSyncAction $action,
@@ -32,7 +32,7 @@ class JiraSyncItemDto
         public readonly ?CarbonImmutable $startedAt,
         public readonly ?string $jiraWorklogId,
         public readonly array $timeEntryIds,
-        public readonly ?string $previousGroupHash = null,
+        public readonly ?string $worklogRowId = null,
     ) {}
 
     /**

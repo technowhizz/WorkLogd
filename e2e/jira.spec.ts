@@ -28,6 +28,7 @@ import {
     setShowMissingTicketHintsViaApi,
     localDate,
     localTimestamp,
+    localWeekday,
     visibleWeekDay,
 } from './utils/jira';
 import type { Page } from '@playwright/test';
@@ -553,6 +554,46 @@ test('test that the sync dialog previews creates, updates, deletes, unchanged an
     await page.getByTestId('jira_sync_close').click();
     await openJiraSyncDialog(page);
     await expect(page.getByTestId('jira_sync_nothing_to_send')).toBeVisible();
+});
+
+test('test that moving an entry to another day previews as an update, not delete and create', async ({
+    page,
+}) => {
+    // Arrange
+    // The dialog seeds from the visible week, so today and tomorrow must both be on screen -
+    // the last visible column is Sunday, per the Monday week start.
+    test.skip(localWeekday() === 0, 'Tomorrow is outside the visible week on a Sunday');
+    const ctx = await jiraOrganization(page);
+    await connectJiraViaApi(ctx);
+    const today = localDate();
+    const tomorrow = localDate(1);
+    const entry = await createTimeEntryWithTimestampsViaApi(ctx, {
+        start: localTimestamp(today, 9),
+        end: localTimestamp(today, 10),
+        description: 'PROJ-1 moved a day later',
+    });
+    await runJiraSyncViaApi(ctx, today, today);
+
+    // Act: the worklog's identity has to survive the date edit - its hash does not
+    const response = await ctx.request.put(
+        `${PLAYWRIGHT_BASE_URL}/api/v1/organizations/${ctx.orgId}/time-entries/${entry.id}`,
+        {
+            data: {
+                member_id: ctx.memberId,
+                start: localTimestamp(tomorrow, 9),
+                end: localTimestamp(tomorrow, 10),
+                description: 'PROJ-1 moved a day later',
+            },
+        }
+    );
+    expect(response.status()).toBe(200);
+    await page.goto(PLAYWRIGHT_BASE_URL + '/calendar');
+    await openJiraSyncDialog(page);
+
+    // Assert: one re-dating update - nothing deleted, nothing duplicated
+    await expect(planRow(page, 'update')).toHaveAttribute('data-issue-key', 'PROJ-1');
+    await expect(page.getByTestId('jira_sync_plan_row')).toHaveCount(1);
+    await expect(page.getByTestId('jira_sync_confirm')).toContainText('Sync 1 to Jira');
 });
 
 test('test that a jira issue the site rejects is reported per worklog', async ({ page }) => {

@@ -212,9 +212,15 @@ Jira specifics:
   `Http::preventStrayRequests()` covers it. Do not copy Socialite's approach here.
 - Worklogs are **reconciled, not journalled.** `JiraSyncService::plan()` recomputes the desired
   worklogs from the entries and diffs them against the `jira_worklogs` rows, producing
-  create/update/delete/unchanged. There is deliberately **no pivot to `time_entries`**: group
-  membership is derived from a `group_hash` of issue key + local date + comment, so an edited
-  description simply moves an entry to a different group and time entry deletion needs no cascade.
+  create/update/delete/unchanged. There is deliberately **no pivot to `time_entries`** and no
+  cascade on entry deletion — but membership *is* recorded: each row stores the
+  `time_entry_ids` it was built from, and matching runs exact `group_hash` first, then entry-id
+  overlap on the same issue (`matchWorklogsToGroups`). That is what lets a reword, a date edit or
+  a timezone change **update the same Jira worklog in place** instead of deleting and recreating
+  it; only a ticket change is delete + create, because Jira cannot move a worklog between issues.
+  A stale id in the array is inert — membership is only ever read as "do the current groups
+  overlap it" — which is why deletion still needs no cleanup. Rows from before the column existed
+  are stamped by the first sync that sees them.
 - Everything is keyed on the user's **local** day, not the UTC one, and worklog `started` carries
   the user's real offset. Both are easy to get wrong and produce work logged on the wrong day.
 - `jira_connections.sync_from_date` is a cutoff: work before it is treated as already logged, which

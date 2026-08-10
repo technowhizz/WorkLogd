@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $work_date
  * @property string|null $comment
  * @property string $group_hash
+ * @property list<string>|null $time_entry_ids
  * @property string $jira_worklog_id
  * @property int $duration_seconds
  * @property Carbon $started_at
@@ -45,6 +46,7 @@ class JiraWorklog extends Model
      */
     protected $casts = [
         'work_date' => 'date',
+        'time_entry_ids' => 'array',
         'duration_seconds' => 'int',
         'started_at' => 'datetime',
         'synced_at' => 'datetime',

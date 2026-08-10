@@ -66,8 +66,9 @@ class JiraSyncService
         $grouping = $this->grouper->group($timeEntries, $user->timezone, $this->config->projectKeys($organization), $syncFromDate);
         // Clamped to the cutoff as well, so a worklog from before it is never reconciled away
         $worklogs = $this->worklogsForRange($user, $organization, max($startDate, $syncFromDate ?? $startDate), $endDate);
+        $movedWorklogs = $this->worklogsMatchingGroupEntries($user, $organization, $grouping->groups, $worklogs);
 
-        $matching = $this->matchWorklogsToGroups($grouping->groups, $worklogs);
+        $matching = $this->matchWorklogsToGroups($grouping->groups, $worklogs, $movedWorklogs);
 
         $items = [];
 
@@ -91,8 +92,9 @@ class JiraSyncService
                 continue;
             }
 
-            // A worklog taken over from another hash is stale by definition: its comment is the
-            // old wording, so there is nothing to compare and no chance of "unchanged".
+            // A worklog matched under another hash is stale by definition: its comment, day or
+            // timezone-derived date is the old value, so there is nothing to compare and no
+            // chance of "unchanged".
             $takenOver = $existing->group_hash !== $group->groupHash;
 
             $items[] = new JiraSyncItemDto(
@@ -108,12 +110,12 @@ class JiraSyncService
                 startedAt: $group->startedAt,
                 jiraWorklogId: $existing->jira_worklog_id,
                 timeEntryIds: $group->timeEntryIds,
-                previousGroupHash: $takenOver ? $existing->group_hash : null,
+                worklogRowId: $existing->getKey(),
             );
         }
 
         // Anything solidtime logged in this range that no longer corresponds to a group: its
-        // entries were deleted, or edited onto a different ticket or day.
+        // entries were deleted, or edited onto a different ticket.
         foreach ($matching['orphans'] as $worklog) {
             $items[] = new JiraSyncItemDto(
                 action: JiraSyncAction::Delete,
@@ -126,6 +128,7 @@ class JiraSyncService
                 startedAt: null,
                 jiraWorklogId: $worklog->jira_worklog_id,
                 timeEntryIds: [],
+                worklogRowId: $worklog->getKey(),
             );
         }
 
@@ -140,26 +143,54 @@ class JiraSyncService
     /**
      * Which worklog each group corresponds to, and which worklogs correspond to nothing.
      *
-     * Exact hash first. Then leftovers are paired on ticket and day, because editing a description
-     * makes a new group - the comment is part of the hash - while the work, the ticket and the day
-     * are the same, so it is still the same worklog. Updating it beats deleting it and making
-     * another: Jira treats those as different things, and the replacement loses its id, its place
-     * in the issue's history and anything anyone attached to it.
+     * A worklog's identity is the entries that formed it, not its wording: time_entry_ids is
+     * recorded when it is written, so any edit that changes the group hash - a reword, a date
+     * moved, a timezone change re-dating history - still finds the same worklog and updates it in
+     * place. Jira treats a delete-and-recreate as a different worklog (new id, new place in the
+     * issue's history, anything attached to it gone), so matching errs towards updating.
      *
-     * Only leftovers pair, so a group that matched its own hash is never stolen from, and time that
-     * moves to a different ticket or a different day still deletes and creates - that really is
-     * different work. Shared by plan() and statusFor() so the preview and the dots cannot disagree
-     * about whether a reword is an update or a create.
+     * Three passes, each over what the one before left unmatched:
+     *
+     *  1. Exact group hash - unchanged content, the common case. Running this first is also what
+     *     makes rewriting a row's hash in place safe against the unique index: an update can only
+     *     want a hash no unmatched row holds, since a row holding it would have matched here. It
+     *     also covers an entry deleted and retyped identically, whose ids differ but content does
+     *     not.
+     *  2. Entry-id overlap, same issue key required - Jira's API cannot move a worklog between
+     *     issues, so a ticket change genuinely is delete-and-create. Pairs are taken best-first:
+     *     most shared entries, then matching comment, then matching day, so when one worklog's
+     *     entries split into two groups the untouched group keeps the worklog and the edited one
+     *     creates. Deterministic order throughout, so the same data always plans the same way.
+     *  3. The ticket-and-day heuristic, only for rows that predate stored ids and so offer
+     *     nothing better to go on. Every sync stamps ids, so this pass retires itself.
+     *
+     * Shared by plan() and statusFor() so the preview and the dots cannot disagree.
      *
      * @param  list<JiraWorklogGroupDto>  $groups
-     * @param  Collection<string, JiraWorklog>  $worklogs  Keyed by group hash
+     * @param  Collection<string, JiraWorklog>  $rangedWorklogs  Rows inside the reconciled date
+     *                                                           range, keyed by group hash. Only
+     *                                                           these may become orphans: the
+     *                                                           range is the reconciliation
+     *                                                           boundary, and a range sync must
+     *                                                           not delete things outside it.
+     * @param  Collection<string, JiraWorklog>  $movedWorklogs  Rows found by entry id whose
+     *                                                          work_date fell outside the range -
+     *                                                          their entries moved. Matchable,
+     *                                                          never orphaned.
      * @return array{matches: array<string, JiraWorklog>, orphans: list<JiraWorklog>}
      */
-    private function matchWorklogsToGroups(array $groups, Collection $worklogs): array
+    private function matchWorklogsToGroups(array $groups, Collection $rangedWorklogs, Collection $movedWorklogs): array
     {
-        $matches = [];
-        $unmatchedGroups = [];
+        /** @var Collection<string, JiraWorklog> $worklogs */
+        $worklogs = $rangedWorklogs->union($movedWorklogs);
 
+        /** @var array<string, JiraWorklog> $matches */
+        $matches = [];
+        /** @var array<string, true> $matchedRowIds */
+        $matchedRowIds = [];
+
+        // Pass 1: exact hash
+        $unmatchedGroups = [];
         foreach ($groups as $group) {
             $existing = $worklogs->get($group->groupHash);
             if ($existing === null) {
@@ -169,39 +200,118 @@ class JiraSyncService
             }
 
             $matches[$group->groupHash] = $existing;
+            $matchedRowIds[$existing->getKey()] = true;
         }
 
-        $spare = [];
-        foreach ($worklogs as $hash => $worklog) {
-            if (isset($matches[$hash])) {
+        // Pass 2: shared entries on the same issue, best pair first
+        $spare = $worklogs->reject(fn (JiraWorklog $worklog): bool => isset($matchedRowIds[$worklog->getKey()]));
+        $pairs = [];
+        foreach ($unmatchedGroups as $groupIndex => $group) {
+            $groupIds = array_flip($group->timeEntryIds);
+            foreach ($spare as $worklog) {
+                if ($worklog->issue_key !== $group->issueKey || $worklog->time_entry_ids === null) {
+                    continue;
+                }
+                $overlap = count(array_intersect_key($groupIds, array_flip($worklog->time_entry_ids)));
+                if ($overlap === 0) {
+                    continue;
+                }
+
+                $pairs[] = [
+                    'rank' => [
+                        -$overlap,
+                        $worklog->comment === $group->comment ? 0 : 1,
+                        $worklog->work_date->format('Y-m-d') === $group->workDate ? 0 : 1,
+                        $groupIndex,
+                        $worklog->jira_worklog_id,
+                    ],
+                    'groupIndex' => $groupIndex,
+                    'worklog' => $worklog,
+                ];
+            }
+        }
+        usort($pairs, static fn (array $a, array $b): int => $a['rank'] <=> $b['rank']);
+
+        foreach ($pairs as $pair) {
+            $group = $unmatchedGroups[$pair['groupIndex']] ?? null;
+            if ($group === null || isset($matchedRowIds[$pair['worklog']->getKey()])) {
                 continue;
             }
 
-            $spare[$worklog->issue_key."\0".$worklog->work_date->format('Y-m-d')][] = $worklog;
+            $matches[$group->groupHash] = $pair['worklog'];
+            $matchedRowIds[$pair['worklog']->getKey()] = true;
+            unset($unmatchedGroups[$pair['groupIndex']]);
+        }
+
+        // Pass 3: rows from before ids were stored - the ticket-and-day heuristic is all they have
+        $legacySpare = [];
+        foreach ($worklogs as $worklog) {
+            if (isset($matchedRowIds[$worklog->getKey()]) || $worklog->time_entry_ids !== null) {
+                continue;
+            }
+
+            $legacySpare[$worklog->issue_key."\0".$worklog->work_date->format('Y-m-d')][] = $worklog;
         }
         // The same data has to pair the same way, whatever order the rows came back in
-        foreach ($spare as &$candidates) {
+        foreach ($legacySpare as &$candidates) {
             usort($candidates, static fn (JiraWorklog $a, JiraWorklog $b): int => [$a->comment ?? '', $a->jira_worklog_id] <=> [$b->comment ?? '', $b->jira_worklog_id]);
         }
         unset($candidates);
 
         foreach ($unmatchedGroups as $group) {
             $key = $group->issueKey."\0".$group->workDate;
-            if (($spare[$key] ?? []) === []) {
+            if (($legacySpare[$key] ?? []) === []) {
                 continue;
             }
 
-            $matches[$group->groupHash] = array_shift($spare[$key]);
+            $worklog = array_shift($legacySpare[$key]);
+            $matches[$group->groupHash] = $worklog;
+            $matchedRowIds[$worklog->getKey()] = true;
         }
 
         $orphans = [];
-        foreach ($spare as $candidates) {
-            foreach ($candidates as $worklog) {
+        foreach ($rangedWorklogs as $worklog) {
+            if (! isset($matchedRowIds[$worklog->getKey()])) {
                 $orphans[] = $worklog;
             }
         }
 
         return ['matches' => $matches, 'orphans' => $orphans];
+    }
+
+    /**
+     * Worklogs whose recorded entries appear in the current groups but whose work_date fell
+     * outside the reconciled range - the signature of an entry moved to another day, by hand or by
+     * a timezone change. Without this a moved entry looks brand new (create) while its old worklog
+     * waits invisibly to be orphaned whenever the old range is next synced: a transient duplicate
+     * in Jira. Found by the GIN-indexed ?| containment operator, written ??| because PDO would
+     * otherwise read the ? as a placeholder.
+     *
+     * @param  list<JiraWorklogGroupDto>  $groups
+     * @param  Collection<string, JiraWorklog>  $alreadyFetched  Keyed by group hash
+     * @return Collection<string, JiraWorklog> Keyed by group hash
+     */
+    private function worklogsMatchingGroupEntries(User $user, Organization $organization, array $groups, Collection $alreadyFetched): Collection
+    {
+        $entryIds = array_merge(...array_map(
+            static fn (JiraWorklogGroupDto $group): array => $group->timeEntryIds,
+            $groups,
+        ) ?: [[]]);
+        if ($entryIds === []) {
+            /** @var Collection<string, JiraWorklog> */
+            return new Collection;
+        }
+
+        // UUIDs only - no quoting or escaping applies inside the array literal
+        $pgArray = '{'.implode(',', $entryIds).'}';
+
+        return JiraWorklog::query()
+            ->where('organization_id', '=', $organization->getKey())
+            ->where('user_id', '=', $user->getKey())
+            ->whereRaw('time_entry_ids ??| ?::text[]', [$pgArray])
+            ->whereNotIn('group_hash', $alreadyFetched->keys())
+            ->get()
+            ->keyBy('group_hash');
     }
 
     /**
@@ -229,9 +339,10 @@ class JiraSyncService
             ];
         }
 
-        // The same pairing the plan uses, so a reworded entry reads as outdated - it has a live
-        // worklog that is merely stale - rather than as never having been logged.
-        $matching = $this->matchWorklogsToGroups($grouping->groups, $worklogs);
+        // The same pairing the plan uses, so a reworded or re-dated entry reads as outdated - it
+        // has a live worklog that is merely stale - rather than as never having been logged.
+        $movedWorklogs = $this->worklogsMatchingGroupEntries($user, $organization, $grouping->groups, $worklogs);
+        $matching = $this->matchWorklogsToGroups($grouping->groups, $worklogs, $movedWorklogs);
 
         foreach ($grouping->groups as $group) {
             $existing = $matching['matches'][$group->groupHash] ?? null;
@@ -291,7 +402,42 @@ class JiraSyncService
             }
         }
 
+        $this->stampMembershipOnUnchangedRows($user, $organization, $plan);
+
         return $results;
+    }
+
+    /**
+     * Backfills time_entry_ids onto rows from before the column existed.
+     *
+     * Creates and updates record membership as they write, but an untouched worklog never reaches
+     * applyItem - actionableItems() filters it - so a pre-migration row that is simply up to date
+     * would stay id-less forever, stuck on the legacy ticket-and-day matching. Stamping it here
+     * means one ordinary sync upgrades every live row.
+     */
+    private function stampMembershipOnUnchangedRows(User $user, Organization $organization, JiraSyncPlanDto $plan): void
+    {
+        $membershipByRowId = [];
+        foreach ($plan->items as $item) {
+            if ($item->action === JiraSyncAction::Unchanged && $item->worklogRowId !== null) {
+                $membershipByRowId[$item->worklogRowId] = $item->timeEntryIds;
+            }
+        }
+        if ($membershipByRowId === []) {
+            return;
+        }
+
+        $rows = JiraWorklog::query()
+            ->where('organization_id', '=', $organization->getKey())
+            ->where('user_id', '=', $user->getKey())
+            ->whereKey(array_keys($membershipByRowId))
+            ->whereNull('time_entry_ids')
+            ->get();
+
+        foreach ($rows as $row) {
+            $row->time_entry_ids = $membershipByRowId[$row->getKey()];
+            $row->save();
+        }
     }
 
     private function applyItem(JiraConnection $connection, User $user, Organization $organization, JiraSyncItemDto $item): void
@@ -303,7 +449,7 @@ class JiraSyncService
             JiraWorklog::query()
                 ->where('organization_id', '=', $organization->getKey())
                 ->where('user_id', '=', $user->getKey())
-                ->where('group_hash', '=', $item->groupHash)
+                ->whereKey($item->worklogRowId)
                 ->delete();
 
             return;
@@ -332,36 +478,49 @@ class JiraSyncService
             );
         }
 
+        $attributes = [
+            'issue_key' => $item->issueKey,
+            'work_date' => $item->workDate,
+            'comment' => $item->comment,
+            'group_hash' => $item->groupHash,
+            'time_entry_ids' => $item->timeEntryIds,
+            'jira_worklog_id' => $worklogId,
+            'duration_seconds' => $item->durationSeconds,
+            'started_at' => $startedAt->utc(),
+            'synced_at' => CarbonImmutable::now(),
+        ];
+
         /*
-         * This update took over a worklog stored under a different hash, so the row that hash
-         * points at has to go. Left behind it would be an orphan holding the same
-         * jira_worklog_id, and the next sync - finding no group for it - would delete the very
-         * worklog just updated. The unique index is on the hash, not the worklog id, so nothing
-         * else would have caught it.
+         * An update rewrites the exact row it matched, whatever hash that row was stored under -
+         * the row is the worklog's identity here, and its hash, date and comment are just
+         * attributes being brought up to date. This is what removes the old failure mode where a
+         * reworded group wrote a second row and left the first behind as an orphan holding the
+         * same jira_worklog_id, to be "cleaned up" - deleting the live worklog - a sync later.
          */
-        if ($item->previousGroupHash !== null && $item->previousGroupHash !== $item->groupHash) {
-            JiraWorklog::query()
+        $row = $item->worklogRowId === null
+            ? null
+            : JiraWorklog::query()
                 ->where('organization_id', '=', $organization->getKey())
                 ->where('user_id', '=', $user->getKey())
-                ->where('group_hash', '=', $item->previousGroupHash)
-                ->delete();
+                ->whereKey($item->worklogRowId)
+                ->first();
+
+        if ($row !== null) {
+            $row->fill($attributes);
+            $row->save();
+
+            return;
         }
 
+        // A create, or the matched row vanished underneath us: keyed on the hash so a retried
+        // create after a half-failed run updates its own leftover instead of violating the index.
         JiraWorklog::query()->updateOrCreate(
             [
                 'organization_id' => $organization->getKey(),
                 'user_id' => $user->getKey(),
                 'group_hash' => $item->groupHash,
             ],
-            [
-                'issue_key' => $item->issueKey,
-                'work_date' => $item->workDate,
-                'comment' => $item->comment,
-                'jira_worklog_id' => $worklogId,
-                'duration_seconds' => $item->durationSeconds,
-                'started_at' => $startedAt->utc(),
-                'synced_at' => CarbonImmutable::now(),
-            ],
+            $attributes,
         );
     }
 

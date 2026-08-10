@@ -184,23 +184,173 @@ class JiraSyncServiceTest extends TestCaseWithDatabase
         $this->assertSame('fix the login redirect', $item->comment);
     }
 
-    public function test_plan_still_deletes_when_the_description_moves_time_to_another_day(): void
+    public function test_plan_re_dates_the_worklog_when_the_entry_moves_to_another_day(): void
     {
         // Arrange
-        // Only same ticket *and* same day is the same worklog. A different day is different work.
+        // Jira can update a worklog's started date in place, so a moved entry keeps its worklog -
+        // the stored entry ids are what still identify it once the day (part of the hash) changed.
         $timeEntry = $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
         $this->syncAndFake('10001');
         $timeEntry->start = '2026-08-06T09:00:00';
         $timeEntry->end = '2026-08-06T10:00:00';
         $timeEntry->save();
 
-        // Act: a range covering both days, so the delete and the create are both in view
+        // Act
+        $plan = $this->service()->plan($this->user, $this->organization, '2026-08-05', '2026-08-06');
+
+        // Assert: one update carrying the new day - not a delete and a create
+        $this->assertCount(1, $plan->items);
+        $item = $plan->items[0];
+        $this->assertSame(JiraSyncAction::Update, $item->action);
+        $this->assertSame('10001', $item->jiraWorklogId);
+        $this->assertSame('2026-08-06', $item->workDate);
+    }
+
+    public function test_plan_finds_a_worklog_whose_entry_moved_out_of_the_synced_range(): void
+    {
+        // Arrange
+        // The old worklog's work_date is outside the planned range, so the date-bounded fetch
+        // cannot see it. Only the stored entry ids connect the moved entry back to it - without
+        // them this would plan a create, duplicating the worklog in Jira.
+        $timeEntry = $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+        $this->syncAndFake('10001');
+        $timeEntry->start = '2026-09-10T09:00:00';
+        $timeEntry->end = '2026-09-10T10:00:00';
+        $timeEntry->save();
+
+        // Act: a September range that never covers the worklog's stored August day
+        $plan = $this->service()->plan($this->user, $this->organization, '2026-09-01', '2026-09-30');
+
+        // Assert
+        $this->assertCount(1, $plan->items);
+        $item = $plan->items[0];
+        $this->assertSame(JiraSyncAction::Update, $item->action);
+        $this->assertSame('10001', $item->jiraWorklogId);
+        $this->assertSame('2026-09-10', $item->workDate);
+    }
+
+    public function test_plan_re_dates_worklogs_when_the_user_changes_timezone(): void
+    {
+        // Arrange
+        // 02:00 UTC is the same calendar day in UTC but the evening before in New York. Changing
+        // the profile timezone re-derives every local day, and before ids were stored that meant
+        // delete-and-create for every affected worklog in history.
+        $this->timeEntry('PROJ-1 fix login', '2026-08-05T02:00:00', '2026-08-05T03:00:00');
+        $this->syncAndFake('10001');
+        $this->user->timezone = 'America/New_York';
+        $this->user->save();
+        $this->user->refresh();
+
+        // Act
+        $plan = $this->service()->plan($this->user, $this->organization, '2026-08-01', '2026-08-31');
+
+        // Assert: the same worklog, moved to the day the work now falls on
+        $this->assertCount(1, $plan->items);
+        $item = $plan->items[0];
+        $this->assertSame(JiraSyncAction::Update, $item->action);
+        $this->assertSame('10001', $item->jiraWorklogId);
+        $this->assertSame('2026-08-04', $item->workDate);
+    }
+
+    public function test_a_second_sync_after_a_day_move_has_nothing_left_to_do(): void
+    {
+        // Arrange
+        // Convergence guard for the re-dating path: if the executed move left the row keyed or
+        // dated wrongly, this second plan would see a phantom delete or create.
+        $timeEntry = $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+        $this->syncAndFake('10001');
+        $timeEntry->start = '2026-08-06T09:00:00';
+        $timeEntry->end = '2026-08-06T10:00:00';
+        $timeEntry->save();
+        Http::fake([self::WORKLOG_URL => Http::response([], 200)]);
+        $this->service()->execute($this->user, $this->organization, $this->service()->plan($this->user, $this->organization, '2026-08-05', '2026-08-06'));
+        Http::clearResolvedInstances();
+
+        // Act
         $plan = $this->service()->plan($this->user, $this->organization, '2026-08-05', '2026-08-06');
         $actions = array_map(static fn ($item): string => $item->action->value, $plan->items);
 
+        // Assert: the one worklog, still the same one, now dated to the new day
+        $this->assertSame(['unchanged'], $actions);
+        $worklog = JiraWorklog::query()->firstOrFail();
+        $this->assertSame('10001', $worklog->jira_worklog_id);
+        $this->assertSame('2026-08-06', $worklog->work_date->format('Y-m-d'));
+    }
+
+    public function test_plan_keeps_the_worklog_with_the_untouched_entry_when_a_group_splits(): void
+    {
+        // Arrange: two entries, one group, one worklog - then one entry reworded away
+        $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+        $reworded = $this->timeEntry('PROJ-1 fix login', '2026-08-05T14:00:00', '2026-08-05T15:00:00');
+        $this->syncAndFake('10001');
+        $reworded->description = 'PROJ-1 write the tests';
+        $reworded->save();
+
+        // Act
+        $plan = $this->service()->plan($this->user, $this->organization, '2026-08-05', '2026-08-05');
+        $byComment = [];
+        foreach ($plan->items as $item) {
+            $byComment[$item->comment ?? ''] = $item;
+        }
+
+        // Assert: the original group keeps the worklog (hash still matches, duration shrank),
+        // and the reworded entry becomes a new one rather than stealing it
+        $this->assertSame(JiraSyncAction::Update, $byComment['fix login']->action);
+        $this->assertSame('10001', $byComment['fix login']->jiraWorklogId);
+        $this->assertSame(3600, $byComment['fix login']->durationSeconds);
+        $this->assertSame(JiraSyncAction::Create, $byComment['write the tests']->action);
+        $this->assertCount(2, $plan->items);
+    }
+
+    public function test_plan_treats_an_entry_retyped_identically_as_unchanged(): void
+    {
+        // Arrange: the entry is deleted and a new one typed with the same description and times.
+        // The ids no longer overlap, but the content hash still matches - nothing to send.
+        $timeEntry = $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+        $this->syncAndFake('10001');
+        $timeEntry->delete();
+        $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+
+        // Act
+        $plan = $this->plan();
+        $actions = array_map(static fn ($item): string => $item->action->value, $plan->items);
+
         // Assert
-        sort($actions);
-        $this->assertSame(['create', 'delete'], $actions);
+        $this->assertSame(['unchanged'], $actions);
+    }
+
+    public function test_plan_matches_a_reworded_legacy_row_that_has_no_stored_ids(): void
+    {
+        // Arrange: a row synced before membership was stored - simulated by clearing the column
+        $timeEntry = $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+        $this->syncAndFake('10001');
+        JiraWorklog::query()->update(['time_entry_ids' => null]);
+        $timeEntry->description = 'PROJ-1 fix the login redirect';
+        $timeEntry->save();
+
+        // Act
+        $plan = $this->plan();
+
+        // Assert: the ticket-and-day heuristic still carries id-less rows
+        $this->assertCount(1, $plan->items);
+        $this->assertSame(JiraSyncAction::Update, $plan->items[0]->action);
+        $this->assertSame('10001', $plan->items[0]->jiraWorklogId);
+    }
+
+    public function test_execute_stamps_membership_onto_an_unchanged_legacy_row(): void
+    {
+        // Arrange: an up-to-date legacy row never reaches applyItem, so the stamping pass is the
+        // only way it gains ids
+        $timeEntry = $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+        $this->syncAndFake('10001');
+        JiraWorklog::query()->update(['time_entry_ids' => null]);
+
+        // Act
+        $this->service()->execute($this->user, $this->organization, $this->plan());
+
+        // Assert
+        $worklog = JiraWorklog::query()->firstOrFail();
+        $this->assertSame([$timeEntry->getKey()], $worklog->time_entry_ids);
     }
 
     public function test_plan_does_not_take_over_a_worklog_that_its_own_group_still_matches(): void
