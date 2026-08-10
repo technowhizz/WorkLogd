@@ -402,7 +402,7 @@ const page = usePage<{
                     <div
                         v-if="isOrganizationLoading"
                         class="flex items-center justify-center h-screen">
-                        <LoadingSpinner />
+                        <LoadingSpinner :size="32" />
                     </div>
                     <slot v-else />
                 </main>

@@ -75,7 +75,7 @@ window.addEventListener('dashboard:refresh', () => {
 <template>
     <DashboardCard title="Recent Time Entries" :icon="CheckCircleIcon">
         <div v-if="isLoading" class="flex justify-center items-center h-40">
-            <LoadingSpinner />
+            <LoadingSpinner :size="32" />
         </div>
         <div v-else-if="filteredLatestTasks && filteredLatestTasks.length > 0">
             <RecentlyTrackedTasksCardEntry

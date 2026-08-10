@@ -23,7 +23,8 @@ const props = withDefaults(
         :disabled="loading"
         class="inline-flex items-center h-9 px-3 text-sm bg-button-primary-background border border-button-primary-border rounded-md font-medium text-button-primary-text hover:bg-button-primary-background-hover active:bg-button-primary-background-hover focus:outline-none focus-visible:ring-2 focus-visible:border-transparent focus-visible:ring-ring transition ease-in-out duration-150">
         <span :class="twMerge('flex items-center ', props.icon ? 'space-x-1.5' : '')">
-            <LoadingSpinner v-if="loading"></LoadingSpinner>
+            <!-- Light tile: an ink tile would vanish into the red fill -->
+            <LoadingSpinner v-if="loading" theme="dark"></LoadingSpinner>
             <component
                 :is="props.icon"
                 v-if="props.icon && !loading"

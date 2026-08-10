@@ -266,7 +266,7 @@ async function createTag(name: string): Promise<Tag | undefined> {
                 @copy-with-time="copyLastWeekWithTime" />
 
             <div v-else class="flex justify-center items-center py-12">
-                <LoadingSpinner />
+                <LoadingSpinner :size="32" />
             </div>
         </div>
 

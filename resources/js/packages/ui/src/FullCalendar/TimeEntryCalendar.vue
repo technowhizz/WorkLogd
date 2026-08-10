@@ -572,7 +572,7 @@ function getEventDurationSeconds(dayEvent: DayEvent, dayStr: string): number {
     <div class="w-full relative h-full flex-1 flex flex-col overflow-hidden min-h-0">
         <div v-if="loading" class="flex items-center justify-center h-full">
             <div class="flex flex-col items-center space-y-4">
-                <LoadingSpinner class="h-8 w-8" />
+                <LoadingSpinner :size="32" />
                 <p class="text-muted-foreground">Loading calendar data...</p>
             </div>
         </div>

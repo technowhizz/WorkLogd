@@ -191,7 +191,7 @@ function goToCalendarDay(date: string) {
             :fix-in-calendar="goToCalendarDay"
             :tags="tags"></TimeEntryGroupedTable>
         <div v-if="isPending" class="flex justify-center items-center py-12">
-            <LoadingSpinner></LoadingSpinner>
+            <LoadingSpinner :size="32"></LoadingSpinner>
         </div>
         <div v-else-if="timeEntries.length === 0" class="text-center pt-12">
             <ClockIcon class="w-8 text-icon-default inline pb-2"></ClockIcon>
@@ -202,7 +202,7 @@ function goToCalendarDay(date: string) {
             <div
                 v-if="isFetchingNextPage"
                 class="flex justify-center items-center py-5 text-sm text-text-primary font-medium">
-                <LoadingSpinner></LoadingSpinner>
+                <LoadingSpinner :size="32"></LoadingSpinner>
                 <span> Loading more time entries... </span>
             </div>
             <div
