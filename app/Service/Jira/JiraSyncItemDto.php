@@ -14,6 +14,12 @@ class JiraSyncItemDto
     /**
      * @param  int|null  $previousDurationSeconds  What Jira currently holds, for an update
      * @param  list<string>  $timeEntryIds  Empty for a delete - its entries are gone
+     * @param  string|null  $previousGroupHash  Set when this update took over a worklog that was
+     *                                          stored under a different hash, because the
+     *                                          description changed. The row keyed by it has to be
+     *                                          dropped as this one is written, or the next sync
+     *                                          finds an orphan pointing at the same Jira worklog
+     *                                          and deletes what was just updated.
      */
     public function __construct(
         public readonly JiraSyncAction $action,
@@ -26,6 +32,7 @@ class JiraSyncItemDto
         public readonly ?CarbonImmutable $startedAt,
         public readonly ?string $jiraWorklogId,
         public readonly array $timeEntryIds,
+        public readonly ?string $previousGroupHash = null,
     ) {}
 
     /**

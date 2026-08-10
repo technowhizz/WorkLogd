@@ -67,14 +67,81 @@ class JiraSyncService
         // Clamped to the cutoff as well, so a worklog from before it is never reconciled away
         $worklogs = $this->worklogsForRange($user, $organization, max($startDate, $syncFromDate ?? $startDate), $endDate);
 
+        /**
+         * Keyed by the position each item takes in the preview, because whether a group creates a
+         * worklog or takes an existing one over is only known after every group has been seen.
+         * Sorted back into a list at the end.
+         *
+         * @var array<int, JiraSyncItemDto>
+         */
         $items = [];
         $matchedHashes = [];
+        /**
+         * Groups with no worklog under their own hash, against the position they will occupy.
+         *
+         * @var array<int, JiraWorklogGroupDto>
+         */
+        $unmatchedGroups = [];
+        $position = 0;
 
         foreach ($grouping->groups as $group) {
             $existing = $worklogs->get($group->groupHash);
 
             if ($existing === null) {
-                $items[] = new JiraSyncItemDto(
+                $unmatchedGroups[$position++] = $group;
+
+                continue;
+            }
+
+            $matchedHashes[] = $group->groupHash;
+
+            $items[$position++] = new JiraSyncItemDto(
+                action: $this->isUpToDate($existing, $group) ? JiraSyncAction::Unchanged : JiraSyncAction::Update,
+                issueKey: $group->issueKey,
+                workDate: $group->workDate,
+                comment: $group->comment,
+                groupHash: $group->groupHash,
+                durationSeconds: $group->durationSeconds,
+                previousDurationSeconds: $existing->duration_seconds,
+                startedAt: $group->startedAt,
+                jiraWorklogId: $existing->jira_worklog_id,
+                timeEntryIds: $group->timeEntryIds,
+            );
+        }
+
+        /*
+         * Editing a description makes a new group, because the comment is part of the hash - but on
+         * the same ticket and the same day it is still the same worklog, so take the existing one
+         * over and update it rather than deleting it and making another. Jira treats those as
+         * different things: a recreated worklog loses its id, its place in the issue's history and
+         * anything anyone attached to it.
+         *
+         * Only leftovers are paired, so a group that matched its own hash is never stolen from, and
+         * a change that moves time to a *different* ticket still deletes and creates - that really
+         * is different work.
+         */
+        $spareWorklogs = [];
+        foreach ($worklogs as $hash => $worklog) {
+            if (in_array($hash, $matchedHashes, true)) {
+                continue;
+            }
+
+            $spareWorklogs[$worklog->issue_key."\0".$worklog->work_date->format('Y-m-d')][] = $worklog;
+        }
+        // Same data has to produce the same plan, whatever order the rows came back in
+        foreach ($spareWorklogs as &$candidates) {
+            usort($candidates, static fn (JiraWorklog $a, JiraWorklog $b): int => [$a->comment ?? '', $a->jira_worklog_id] <=> [$b->comment ?? '', $b->jira_worklog_id]);
+        }
+        unset($candidates);
+
+        foreach ($unmatchedGroups as $index => $group) {
+            $key = $group->issueKey."\0".$group->workDate;
+            $candidate = ($spareWorklogs[$key] ?? []) === []
+                ? null
+                : array_shift($spareWorklogs[$key]);
+
+            if ($candidate === null) {
+                $items[$index] = new JiraSyncItemDto(
                     action: JiraSyncAction::Create,
                     issueKey: $group->issueKey,
                     workDate: $group->workDate,
@@ -90,30 +157,30 @@ class JiraSyncService
                 continue;
             }
 
-            $matchedHashes[] = $group->groupHash;
-
-            $items[] = new JiraSyncItemDto(
-                action: $this->isUpToDate($existing, $group) ? JiraSyncAction::Unchanged : JiraSyncAction::Update,
+            $matchedHashes[] = $candidate->group_hash;
+            $items[$index] = new JiraSyncItemDto(
+                action: JiraSyncAction::Update,
                 issueKey: $group->issueKey,
                 workDate: $group->workDate,
                 comment: $group->comment,
                 groupHash: $group->groupHash,
                 durationSeconds: $group->durationSeconds,
-                previousDurationSeconds: $existing->duration_seconds,
+                previousDurationSeconds: $candidate->duration_seconds,
                 startedAt: $group->startedAt,
-                jiraWorklogId: $existing->jira_worklog_id,
+                jiraWorklogId: $candidate->jira_worklog_id,
                 timeEntryIds: $group->timeEntryIds,
+                previousGroupHash: $candidate->group_hash,
             );
         }
 
         // Anything solidtime logged in this range that no longer corresponds to a group: its
-        // entries were deleted, or edited into a different group.
+        // entries were deleted, or edited onto a different ticket.
         foreach ($worklogs as $hash => $worklog) {
             if (in_array($hash, $matchedHashes, true)) {
                 continue;
             }
 
-            $items[] = new JiraSyncItemDto(
+            $items[$position++] = new JiraSyncItemDto(
                 action: JiraSyncAction::Delete,
                 issueKey: $worklog->issue_key,
                 workDate: $worklog->work_date->format('Y-m-d'),
@@ -127,10 +194,12 @@ class JiraSyncService
             );
         }
 
+        ksort($items);
+
         return new JiraSyncPlanDto(
             startDate: $startDate,
             endDate: $endDate,
-            items: $items,
+            items: array_values($items),
             skipped: $this->describeSkipped($timeEntries, $grouping->skipped),
         );
     }
@@ -256,6 +325,21 @@ class JiraSyncService
                 $startedAt,
                 $item->durationSeconds,
             );
+        }
+
+        /*
+         * This update took over a worklog stored under a different hash, so the row that hash
+         * points at has to go. Left behind it would be an orphan holding the same
+         * jira_worklog_id, and the next sync - finding no group for it - would delete the very
+         * worklog just updated. The unique index is on the hash, not the worklog id, so nothing
+         * else would have caught it.
+         */
+        if ($item->previousGroupHash !== null && $item->previousGroupHash !== $item->groupHash) {
+            JiraWorklog::query()
+                ->where('organization_id', '=', $organization->getKey())
+                ->where('user_id', '=', $user->getKey())
+                ->where('group_hash', '=', $item->previousGroupHash)
+                ->delete();
         }
 
         JiraWorklog::query()->updateOrCreate(

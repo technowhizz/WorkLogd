@@ -164,6 +164,121 @@ class JiraSyncServiceTest extends TestCaseWithDatabase
         $this->assertSame(['create:PROJ-2', 'delete:PROJ-1'], $actions);
     }
 
+    public function test_plan_updates_the_existing_worklog_when_only_the_description_changed(): void
+    {
+        // Arrange
+        $timeEntry = $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+        $this->syncAndFake('10001');
+        // Same ticket, same day, reworded
+        $timeEntry->description = 'PROJ-1 fix the login redirect';
+        $timeEntry->save();
+
+        // Act
+        $plan = $this->plan();
+
+        // Assert: the worklog is taken over, not destroyed and remade
+        $this->assertCount(1, $plan->items);
+        $item = $plan->items[0];
+        $this->assertSame(JiraSyncAction::Update, $item->action);
+        $this->assertSame('10001', $item->jiraWorklogId);
+        $this->assertSame('fix the login redirect', $item->comment);
+    }
+
+    public function test_plan_still_deletes_when_the_description_moves_time_to_another_day(): void
+    {
+        // Arrange
+        // Only same ticket *and* same day is the same worklog. A different day is different work.
+        $timeEntry = $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+        $this->syncAndFake('10001');
+        $timeEntry->start = '2026-08-06T09:00:00';
+        $timeEntry->end = '2026-08-06T10:00:00';
+        $timeEntry->save();
+
+        // Act: a range covering both days, so the delete and the create are both in view
+        $plan = $this->service()->plan($this->user, $this->organization, '2026-08-05', '2026-08-06');
+        $actions = array_map(static fn ($item): string => $item->action->value, $plan->items);
+
+        // Assert
+        sort($actions);
+        $this->assertSame(['create', 'delete'], $actions);
+    }
+
+    public function test_plan_does_not_take_over_a_worklog_that_its_own_group_still_matches(): void
+    {
+        // Arrange: two worklogs on one ticket and day, then one of them reworded onto a third
+        // description. The untouched one must keep its own worklog rather than being paired off.
+        $renamed = $this->timeEntry('PROJ-1 alpha', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+        $this->timeEntry('PROJ-1 beta', '2026-08-05T11:00:00', '2026-08-05T12:00:00');
+        Http::fake([self::WORKLOG_URL => Http::sequence()
+            ->push(['id' => '10001'], 201)
+            ->push(['id' => '10002'], 201), ]);
+        $this->service()->execute($this->user, $this->organization, $this->plan());
+        Http::clearResolvedInstances();
+        $renamed->description = 'PROJ-1 gamma';
+        $renamed->save();
+
+        // Act
+        $plan = $this->plan();
+        $byComment = [];
+        foreach ($plan->items as $item) {
+            $byComment[$item->comment ?? ''] = $item;
+        }
+
+        // Assert: gamma inherits alpha's worklog, beta is untouched, nothing is deleted
+        $this->assertSame(JiraSyncAction::Update, $byComment['gamma']->action);
+        $this->assertSame('10001', $byComment['gamma']->jiraWorklogId);
+        $this->assertSame(JiraSyncAction::Unchanged, $byComment['beta']->action);
+        $this->assertSame('10002', $byComment['beta']->jiraWorklogId);
+        $this->assertCount(2, $plan->items);
+    }
+
+    public function test_execute_rewords_a_worklog_in_place_and_leaves_no_orphan_row(): void
+    {
+        // Arrange
+        $timeEntry = $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+        $this->syncAndFake('10001');
+        $timeEntry->description = 'PROJ-1 fix the login redirect';
+        $timeEntry->save();
+        Http::fake([self::WORKLOG_URL => Http::response([], 200)]);
+
+        // Act
+        $this->service()->execute($this->user, $this->organization, $this->plan());
+
+        // Assert: Jira was asked to update the same worklog, with the new comment
+        Http::assertSent(function (Request $request): bool {
+            return $request->method() === 'PUT'
+                && str_ends_with((string) parse_url($request->url(), PHP_URL_PATH), '/worklog/10001')
+                && str_contains(json_encode($request->data()) ?: '', 'fix the login redirect');
+        });
+        // One row, re-keyed to the new hash. A second row would look like an orphan next time and
+        // take the worklog down with it.
+        $this->assertSame(1, JiraWorklog::query()->count());
+        $worklog = JiraWorklog::query()->firstOrFail();
+        $this->assertSame('10001', $worklog->jira_worklog_id);
+        $this->assertSame('fix the login redirect', $worklog->comment);
+    }
+
+    public function test_a_second_sync_after_a_reword_has_nothing_left_to_do(): void
+    {
+        // Arrange
+        // The regression this guards: if the reworded row were written alongside the old one, this
+        // second plan would find the leftover, call it an orphan, and delete the live worklog.
+        $timeEntry = $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+        $this->syncAndFake('10001');
+        $timeEntry->description = 'PROJ-1 fix the login redirect';
+        $timeEntry->save();
+        Http::fake([self::WORKLOG_URL => Http::response([], 200)]);
+        $this->service()->execute($this->user, $this->organization, $this->plan());
+        Http::clearResolvedInstances();
+
+        // Act
+        $plan = $this->plan();
+        $actions = array_map(static fn ($item): string => $item->action->value, $plan->items);
+
+        // Assert
+        $this->assertSame(['unchanged'], $actions);
+    }
+
     public function test_plan_reports_why_each_entry_was_skipped(): void
     {
         // Arrange
