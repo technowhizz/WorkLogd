@@ -13,8 +13,12 @@ name: "Build and publish to GHCR"
 
 on:
     push:
+        # Both, because the branch this fork lives on differs by remote: worklogd on
+        # technowhizz/WorkLogd, main on the older technowhizz/solidtime. Listing one would
+        # silently never fire on the other.
         branches:
             - main
+            - worklogd
         tags:
             - "v*"
     workflow_dispatch:
@@ -187,7 +191,8 @@ jobs:
                       type=semver,pattern={{major}}
                       # Every push to main is addressable by its commit
                       type=sha,prefix=sha-,format=short
-                      # "latest" tracks main. Point production at a version tag instead.
+                      # "latest" tracks whichever branch the repository calls default.
+                      # Point production at a version tag instead.
                       type=raw,value=latest,enable={{is_default_branch}}
 
             - name: "Log in to GHCR"
