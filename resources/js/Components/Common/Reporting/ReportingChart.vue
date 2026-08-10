@@ -88,14 +88,28 @@ const HOUR_IN_SECONDS = 3600;
 const Y_AXIS_STEPS_IN_HOURS = [1, 2, 4, 8, 12, 24, 48, 96, 168, 336, 720];
 const MAX_Y_AXIS_LINES = 4;
 
+const maxSeriesSeconds = computed(() =>
+    Math.max(0, ...(props.groupedData?.map((el) => el.seconds ?? 0) ?? []))
+);
+
 const yAxisIntervalInSeconds = computed(() => {
-    const maxSeconds = Math.max(0, ...(props.groupedData?.map((el) => el.seconds ?? 0) ?? []));
-    const maxHours = maxSeconds / HOUR_IN_SECONDS;
+    const maxHours = maxSeriesSeconds.value / HOUR_IN_SECONDS;
     const step =
         Y_AXIS_STEPS_IN_HOURS.find((candidate) => maxHours / candidate <= MAX_Y_AXIS_LINES) ??
         Math.ceil(maxHours / MAX_Y_AXIS_LINES);
 
     return Math.max(1, step) * HOUR_IN_SECONDS;
+});
+
+/*
+ * Rounded up to a whole number of intervals. Setting interval alone is not enough: echarts still
+ * picks its own "nice" maximum, and when that is not a multiple of the interval the top gridline
+ * lands a part-step above the one below it - 0h, 4h, 8h, 12h, then 14h.
+ */
+const yAxisMaxInSeconds = computed(() => {
+    const interval = yAxisIntervalInSeconds.value;
+
+    return Math.max(interval, Math.ceil(maxSeriesSeconds.value / interval) * interval);
 });
 
 const seriesData = computed(() => {
@@ -180,6 +194,8 @@ const option = computed(() => ({
     },
     yAxis: {
         type: 'value',
+        min: 0,
+        max: yAxisMaxInSeconds.value,
         interval: yAxisIntervalInSeconds.value,
         axisLabel: {
             show: true,
