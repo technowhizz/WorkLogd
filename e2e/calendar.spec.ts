@@ -1,5 +1,6 @@
 import { PLAYWRIGHT_BASE_URL } from '../playwright/config';
 import { test } from '../playwright/fixtures';
+import { localDate, localDateOf } from './utils/dates';
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import {
@@ -1020,9 +1021,7 @@ test.describe('Drag-to-Move Events', () => {
         await goToCalendar(page);
         await scrollCalendarToTime(page, '00:00:00');
 
-        const todayStr = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-            .toISOString()
-            .split('T')[0];
+        const todayStr = localDate();
         const todayCol = page.locator(`.fc-timegrid-col[data-date="${todayStr}"]`);
         const event = todayCol
             .locator('.fc-event')
@@ -1060,10 +1059,8 @@ test.describe('Drag-to-Move Events', () => {
         expect(newDurationMs).toBe(3600000);
 
         // The event should have moved to the previous day
-        const yesterdayStr = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
-            .toISOString()
-            .split('T')[0];
-        expect(newStart.toISOString().split('T')[0]).toBe(yesterdayStr);
+        const yesterdayStr = localDate(-1);
+        expect(localDateOf(newStart)).toBe(yesterdayStr);
     });
 
     test('escape during drag cancels the move and leaves the entry untouched', async ({
@@ -1872,12 +1869,8 @@ test.describe('Click-Drag Selection to Create', () => {
         await scrollCalendarToTime(page, '10:00:00');
 
         // Find today's and tomorrow's columns
-        const todayStr = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-            .toISOString()
-            .split('T')[0];
-        const tomorrowStr = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-            .toISOString()
-            .split('T')[0];
+        const todayStr = localDate();
+        const tomorrowStr = localDate(1);
 
         const todayCol = page.locator(`.fc-timegrid-col[data-date="${todayStr}"]`);
         const tomorrowCol = page.locator(`.fc-timegrid-col[data-date="${tomorrowStr}"]`);
@@ -2193,9 +2186,7 @@ test.describe('Multi-Day Events', () => {
         await scrollCalendarToTime(page, '00:00:00');
 
         // Find the clipped segment on tomorrow's column (00:00-02:00)
-        const tomorrowStr = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-            .toISOString()
-            .split('T')[0];
+        const tomorrowStr = localDate(1);
         const tomorrowCol = page.locator(`.fc-timegrid-col[data-date="${tomorrowStr}"]`);
         const event = tomorrowCol.locator('.fc-event').filter({ hasText: 'Multi day drag test' });
         await expect(event).toBeVisible({ timeout: 10000 });
@@ -2233,10 +2224,8 @@ test.describe('Multi-Day Events', () => {
         expect(Math.abs(newDurationMs - origDurationMs)).toBeLessThan(60000);
 
         // The start should still be on today (not jumped to tomorrow)
-        const todayStr = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-            .toISOString()
-            .split('T')[0];
-        expect(newStart.toISOString().split('T')[0]).toBe(todayStr);
+        const todayStr = localDate();
+        expect(localDateOf(newStart)).toBe(todayStr);
     });
 
     test('dragging clipped segment of multi-day event upward shifts event earlier', async ({
@@ -2263,9 +2252,7 @@ test.describe('Multi-Day Events', () => {
         await scrollCalendarToTime(page, '00:00:00');
 
         // Find the clipped segment on tomorrow's column (00:00-02:00)
-        const tomorrowStr = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-            .toISOString()
-            .split('T')[0];
+        const tomorrowStr = localDate(1);
         const tomorrowCol = page.locator(`.fc-timegrid-col[data-date="${tomorrowStr}"]`);
         const event = tomorrowCol
             .locator('.fc-event')

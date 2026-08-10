@@ -20,9 +20,10 @@ import { expect } from '@playwright/test';
 import type { Page, Request } from '@playwright/test';
 import {
     createProjectViaApi,
-    createTimeEntryAtHourViaApi,
+    createTimeEntryWithTimestampsViaApi,
     getTimeEntriesViaApi,
 } from './utils/api';
+import type { TestContext } from './utils/api';
 
 // ──────────────────────────────────────────────────
 // Helpers
@@ -35,12 +36,14 @@ async function goToTimesheet(page: Page) {
     await page.goto(PLAYWRIGHT_BASE_URL + '/timesheet');
 }
 
+// Local, to match the days the timesheet renders. Taking UTC midnight instead lands on the
+// previous local day for anyone west of Greenwich.
 function getMonday(d: Date): Date {
     const date = new Date(d);
-    const day = date.getUTCDay();
-    const diff = date.getUTCDate() - day + (day === 0 ? -6 : 1);
-    date.setUTCDate(diff);
-    date.setUTCHours(0, 0, 0, 0);
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    date.setDate(diff);
+    date.setHours(0, 0, 0, 0);
     return date;
 }
 
@@ -63,12 +66,43 @@ async function waitForTimesheetLoad(page: Page) {
 
 const HOUR = 3600;
 
-function utcHourOf(iso: string): number {
-    return new Date(iso).getUTCHours();
+/*
+ * The timesheet places and displays entries in the user's timezone, and every assertion below is
+ * about the hour it shows. Seeding at a UTC hour instead made the fixtures land an offset away
+ * from where the tests said they were, so on a host east of Greenwich the "blocked" 09:00 slot
+ * was actually free and the placement logic legitimately chose a different time. Seeds and
+ * assertions both work in local hours now, which is the same clock the app reasons on.
+ */
+async function seedEntryAtLocalHour(
+    ctx: TestContext,
+    data: {
+        date: Date;
+        startHour: number;
+        startMinute?: number;
+        durationSeconds: number;
+        projectId?: string | null;
+        description?: string;
+    }
+) {
+    const start = new Date(data.date);
+    start.setHours(data.startHour, data.startMinute ?? 0, 0, 0);
+    const end = new Date(start.getTime() + data.durationSeconds * 1000);
+    const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+    return createTimeEntryWithTimestampsViaApi(ctx, {
+        start: iso(start),
+        end: iso(end),
+        projectId: data.projectId ?? null,
+        description: data.description ?? '',
+    });
 }
 
-function utcMinuteOf(iso: string): number {
-    return new Date(iso).getUTCMinutes();
+function hourOf(iso: string): number {
+    return new Date(iso).getHours();
+}
+
+function minuteOf(iso: string): number {
+    return new Date(iso).getMinutes();
 }
 
 function sortByStart<T extends { start: string }>(entries: T[]): T[] {
@@ -126,13 +160,13 @@ test('extendCell on a row that has no entries on the day yet places after anothe
     const projectA = await createProjectViaApi(ctx, { name: 'OverlapAlpha' });
     const projectB = await createProjectViaApi(ctx, { name: 'OverlapBravo' });
 
-    await createTimeEntryAtHourViaApi(ctx, {
+    await seedEntryAtLocalHour(ctx, {
         date: monday,
         startHour: 9,
         durationSeconds: HOUR,
         projectId: projectA.id,
     });
-    await createTimeEntryAtHourViaApi(ctx, {
+    await seedEntryAtLocalHour(ctx, {
         date: tuesday,
         startHour: 9,
         durationSeconds: HOUR,
@@ -168,7 +202,7 @@ test('extendCell on a row that has no entries on the day yet places after anothe
     )!;
     expect(bMondayEntry).toBeDefined();
     // 09:00 is blocked → must be at 10:00 or later.
-    expect(utcHourOf(bMondayEntry.start)).toBeGreaterThanOrEqual(10);
+    expect(hourOf(bMondayEntry.start)).toBeGreaterThanOrEqual(10);
     expectNoOverlaps(entries);
 });
 
@@ -191,13 +225,13 @@ test('createCell refuses to cross midnight when day is full (Scenario #3)', asyn
     const projectFull = await createProjectViaApi(ctx, { name: 'OverlapFull' });
     const projectNew = await createProjectViaApi(ctx, { name: 'OverlapNoRoom' });
 
-    await createTimeEntryAtHourViaApi(ctx, {
+    await seedEntryAtLocalHour(ctx, {
         date: monday,
         startHour: 1,
         durationSeconds: 22 * HOUR,
         projectId: projectFull.id,
     });
-    await createTimeEntryAtHourViaApi(ctx, {
+    await seedEntryAtLocalHour(ctx, {
         date: tuesday,
         startHour: 9,
         durationSeconds: HOUR,
@@ -227,9 +261,9 @@ test('createCell refuses to cross midnight when day is full (Scenario #3)', asyn
     const newEntries = entries.filter((e) => e.project_id === projectNew.id);
     expect(seenMutationRequests).toEqual([]);
     expect(newEntries).toHaveLength(1);
-    expect(utcHourOf(newEntries[0]!.start)).toBe(9);
+    expect(hourOf(newEntries[0]!.start)).toBe(9);
     // The Tuesday entry's date is unchanged (still Tuesday).
-    expect(new Date(newEntries[0]!.start).getUTCDay()).toBe(2);
+    expect(new Date(newEntries[0]!.start).getDay()).toBe(2);
 });
 
 // ──────────────────────────────────────────────────
@@ -250,13 +284,13 @@ test('extendCell splits the extension when another row blocks the path (Scenario
     const projectA = await createProjectViaApi(ctx, { name: 'OverlapExtend' });
     const projectB = await createProjectViaApi(ctx, { name: 'OverlapBlocker' });
 
-    await createTimeEntryAtHourViaApi(ctx, {
+    await seedEntryAtLocalHour(ctx, {
         date: monday,
         startHour: 9,
         durationSeconds: HOUR,
         projectId: projectA.id,
     });
-    await createTimeEntryAtHourViaApi(ctx, {
+    await seedEntryAtLocalHour(ctx, {
         date: monday,
         startHour: 10,
         startMinute: 30,
@@ -292,19 +326,19 @@ test('extendCell splits the extension when another row blocks the path (Scenario
 
     // The blocker is unchanged.
     expect(bEntries).toHaveLength(1);
-    expect(utcHourOf(bEntries[0]!.start)).toBe(10);
-    expect(utcMinuteOf(bEntries[0]!.start)).toBe(30);
+    expect(hourOf(bEntries[0]!.start)).toBe(10);
+    expect(minuteOf(bEntries[0]!.start)).toBe(30);
 
     // Project A should now have 2 entries.
     expect(aEntries).toHaveLength(2);
     const sortedA = sortByStart(aEntries);
     // Extended entry: 09:00 → 10:30
-    expect(utcHourOf(sortedA[0]!.start)).toBe(9);
-    expect(utcHourOf(sortedA[0]!.end!)).toBe(10);
-    expect(utcMinuteOf(sortedA[0]!.end!)).toBe(30);
+    expect(hourOf(sortedA[0]!.start)).toBe(9);
+    expect(hourOf(sortedA[0]!.end!)).toBe(10);
+    expect(minuteOf(sortedA[0]!.end!)).toBe(30);
     // Split remainder: 11:30 → 13:00
-    expect(utcHourOf(sortedA[1]!.start)).toBe(11);
-    expect(utcMinuteOf(sortedA[1]!.start)).toBe(30);
+    expect(hourOf(sortedA[1]!.start)).toBe(11);
+    expect(minuteOf(sortedA[1]!.start)).toBe(30);
 
     // No overlaps anywhere on the day.
     expectNoOverlaps(entries);
@@ -322,14 +356,14 @@ test('extendCell prefers latest-end (not latest-start) when nested entries exist
     const monday = getCurrentWeekMonday();
     const project = await createProjectViaApi(ctx, { name: 'OverlapNested' });
 
-    await createTimeEntryAtHourViaApi(ctx, {
+    await seedEntryAtLocalHour(ctx, {
         date: monday,
         startHour: 9,
         durationSeconds: 3 * HOUR,
         projectId: project.id,
         description: 'outer',
     });
-    await createTimeEntryAtHourViaApi(ctx, {
+    await seedEntryAtLocalHour(ctx, {
         date: monday,
         startHour: 10,
         durationSeconds: HOUR,
@@ -358,10 +392,10 @@ test('extendCell prefers latest-end (not latest-start) when nested entries exist
     const outer = entries.find((e) => e.description === 'outer')!;
     const inner = entries.find((e) => e.description === 'inner')!;
 
-    expect(utcHourOf(outer.start)).toBe(9);
-    expect(utcHourOf(outer.end!)).toBe(13); // extended from 12:00 → 13:00
-    expect(utcHourOf(inner.start)).toBe(10);
-    expect(utcHourOf(inner.end!)).toBe(11); // unchanged
+    expect(hourOf(outer.start)).toBe(9);
+    expect(hourOf(outer.end!)).toBe(13); // extended from 12:00 → 13:00
+    expect(hourOf(inner.start)).toBe(10);
+    expect(hourOf(inner.end!)).toBe(11); // unchanged
 });
 
 // ──────────────────────────────────────────────────
@@ -390,7 +424,7 @@ test('createCell handles intra-week spillover from previous day (Scenario #2)', 
     const projectNew = await createProjectViaApi(ctx, { name: 'OverlapToday' });
 
     // Monday 22:00 → Tuesday 03:00 (5h spillover into Tuesday).
-    await createTimeEntryAtHourViaApi(ctx, {
+    await seedEntryAtLocalHour(ctx, {
         date: monday,
         startHour: 22,
         durationSeconds: 5 * HOUR,
@@ -398,7 +432,7 @@ test('createCell handles intra-week spillover from previous day (Scenario #2)', 
     });
     // Stub Wednesday entry on the new project so its row is visible
     // even before we type anything in Tuesday's cell.
-    await createTimeEntryAtHourViaApi(ctx, {
+    await seedEntryAtLocalHour(ctx, {
         date: wednesday,
         startHour: 9,
         durationSeconds: HOUR,
@@ -432,6 +466,6 @@ test('createCell handles intra-week spillover from previous day (Scenario #2)', 
     )!;
     expect(newTuesdayEntry).toBeDefined();
     // 09:00 is well past the spillover end (03:00) → should land at 09:00.
-    expect(utcHourOf(newTuesdayEntry.start)).toBe(9);
+    expect(hourOf(newTuesdayEntry.start)).toBe(9);
     expectNoOverlaps(entries);
 });

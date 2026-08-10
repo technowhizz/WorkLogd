@@ -1,5 +1,6 @@
 import { PLAYWRIGHT_BASE_URL } from '../playwright/config';
 import { test } from '../playwright/fixtures';
+import { localTimeToUtc } from './utils/dates';
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import {
@@ -807,7 +808,8 @@ test('test that the placement modal warns when the chosen time would leave the b
 
     const dayEntries = await getDayEntriesViaApi(ctx, day);
     expect(dayEntries.map((e) => [e.type, e.start, e.end])).toEqual([
-        ['break', `${day}T07:00:00Z`, `${day}T07:30:00Z`],
+        // Typed into the picker as local time, so stored an offset away from it
+        ['break', localTimeToUtc(day, '07:00'), localTimeToUtc(day, '07:30')],
         ['work', `${day}T09:00:00Z`, `${day}T12:00:00Z`],
         ['work', `${day}T12:00:00Z`, `${day}T17:00:00Z`],
     ]);
