@@ -56,11 +56,13 @@ abstract class ApiException extends Exception
     /**
      * Report the exception.
      *
-     * @return bool true means the exception handler will not report it again
+     * Returning **false** hands the exception back to the default handler, which logs it - see
+     * Handler::reportThrowable(), which only skips its own reporting when this returns something
+     * other than false. So API errors DO reach the log as they are. Return true here to silence a
+     * subclass instead.
      */
     public function report(): bool
     {
-        // TODO: temporary activated
         return false;
     }
 }

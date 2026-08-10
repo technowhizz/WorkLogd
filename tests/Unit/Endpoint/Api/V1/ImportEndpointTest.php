@@ -10,9 +10,11 @@ use App\Models\Organization;
 use App\Service\Import\Importers\ImportException;
 use App\Service\Import\Importers\ReportDto;
 use App\Service\Import\ImportService;
+use Illuminate\Support\Facades\Log;
 use Laravel\Passport\Passport;
 use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\UsesClass;
+use TiMacDonald\Log\LogEntry;
 
 #[UsesClass(ImportController::class)]
 class ImportEndpointTest extends ApiEndpointTestAbstract
@@ -100,6 +102,35 @@ class ImportEndpointTest extends ApiEndpointTestAbstract
         $response->assertExactJson([
             'message' => 'Invalid base64 encoded data',
         ]);
+        // Reported, so that this 400 is distinguishable in the log from the request never arriving
+        Log::assertLogged(fn (LogEntry $log) => $log->level === 'warning'
+            && $log->message === 'Import rejected: data is not valid base64'
+            && $log->context['organization_id'] === $user->organization->getKey()
+            && $log->context['importer_type'] === 'toggl_time_entries'
+            && $log->context['payload_length'] === strlen('some invalid data ...')
+        );
+    }
+
+    public function test_import_does_not_log_the_payload_when_rejecting_invalid_base64(): void
+    {
+        // Arrange
+        $user = $this->createUserWithPermission([
+            'import',
+        ]);
+        Passport::actingAs($user->user);
+        $secret = 'a-customers-private-data-not-for-the-log';
+
+        // Act
+        $response = $this->postJson(route('api.v1.import.import', ['organization' => $user->organization->getKey()]), [
+            'type' => 'toggl_time_entries',
+            'data' => $secret.' ...',
+        ]);
+
+        // Assert
+        $response->assertStatus(400);
+        Log::assertLogged(fn (LogEntry $log) => $log->message === 'Import rejected: data is not valid base64'
+            && ! str_contains(json_encode($log->context) ?: '', $secret)
+        );
     }
 
     public function test_import_return_error_message_if_import_fails(): void

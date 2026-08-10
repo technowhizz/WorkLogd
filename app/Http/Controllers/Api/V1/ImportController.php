@@ -13,6 +13,7 @@ use App\Service\Import\Importers\ImportException;
 use App\Service\Import\ImportService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 
 class ImportController extends Controller
 {
@@ -64,6 +65,21 @@ class ImportController extends Controller
         try {
             $importData = base64_decode($request->input('data'), true);
             if ($importData === false) {
+                /*
+                 * Logged because every other way this endpoint can answer 400 is reported, and a
+                 * silent one is indistinguishable from the request never arriving - which is
+                 * exactly the wrong guess to be left with. The payload itself is deliberately not
+                 * logged: it is the customer's data. Its length is, since a truncated body on the
+                 * way in is the likeliest way to get here with an otherwise valid file.
+                 */
+                $data = $request->input('data');
+                Log::warning('Import rejected: data is not valid base64', [
+                    'organization_id' => $organization->getKey(),
+                    'user_id' => $this->user()->getKey(),
+                    'importer_type' => $request->input('type'),
+                    'payload_length' => is_string($data) ? strlen($data) : null,
+                ]);
+
                 return new JsonResponse([
                     'message' => 'Invalid base64 encoded data',
                 ], 400);
