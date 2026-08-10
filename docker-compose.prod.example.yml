@@ -6,9 +6,10 @@
 #   ./generate-secrets.sh          # writes worklogd.prod.env next to this file
 #   docker compose -f docker-compose.prod.yml up -d
 #
-# generate-secrets.sh prints two follow-up commands to run after the first boot: one creates
-# the personal access client row the API token screen needs, the other creates the first user.
-# There is no sign-up here and no setup wizard - see APP_ENABLE_REGISTRATION below.
+# The app container migrates the database, creates the storage directories and creates the
+# personal access client the API token screen needs, all on boot. The one command left to run
+# by hand is the first user - there is no sign-up here and no setup wizard, so see
+# APP_ENABLE_REGISTRATION below. generate-secrets.sh prints it at the end.
 #
 # Every service reads worklogd.prod.env. postgres only needs POSTGRES_PASSWORD out of
 # it and ignores the rest.
@@ -53,10 +54,11 @@ x-app-env: &app-env
     QUEUE_CONNECTION: redis
     SESSION_DRIVER: database
 
-    # PASSPORT_PRIVATE_KEY, PASSPORT_PUBLIC_KEY, PASSPORT_PERSONAL_ACCESS_CLIENT_ID and
-    # PASSPORT_PERSONAL_ACCESS_CLIENT_SECRET come from worklogd.prod.env. They are shared by
-    # every container and must survive a redeploy - regenerating them invalidates every
-    # existing API token and logs everyone out of the mobile/desktop apps.
+    # PASSPORT_PRIVATE_KEY and PASSPORT_PUBLIC_KEY come from worklogd.prod.env. They are
+    # shared by every container and must survive a redeploy - regenerating them invalidates
+    # every existing API token and logs everyone out of the mobile/desktop apps.
+    # There is no PASSPORT_PERSONAL_ACCESS_CLIENT_ID/_SECRET here: Passport 13 finds that
+    # client by querying oauth_clients, and the app container creates the row on boot.
 
     MAIL_MAILER: smtp
     MAIL_HOST: 'smtp.example.com'

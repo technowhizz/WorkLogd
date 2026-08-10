@@ -108,10 +108,14 @@ organization still has to create an account before they can accept, so an invita
 sign-up screen for the person holding it - and only for the address the invitation was sent to.
 
 `generate-secrets.sh` produces every value that is yours to invent - `APP_KEY`, the database
-password, the Passport signing keys and the personal access client credentials - and prints the one
-command to run after the first boot, which creates the `oauth_clients` row those credentials refer
-to. Keep that env file: `APP_KEY` decrypts the stored Jira and Google tokens, and the Passport keys
-sign every API token in circulation, so regenerating them is not recoverable.
+password and the Passport signing keys. Keep that env file: `APP_KEY` decrypts the stored Jira and
+Google tokens, and the Passport keys sign every API token in circulation, so regenerating them is
+not recoverable.
+
+Nothing else needs bootstrapping by hand. On boot the app container creates the `storage`
+directories (a bind-mounted `storage/` starts empty and masks the image's copy, unlike a named
+volume), migrates the database, and creates the personal access client that the API token screen
+mints tokens through. All three are idempotent, so they simply pass on every later boot.
 
 Note the **queue worker is not optional here**. A Jira sync runs as a queued job, so without one the
 sync dialog waits forever. That also means the cache must be shared between containers rather than

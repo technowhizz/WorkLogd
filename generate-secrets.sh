@@ -12,14 +12,13 @@
 # people's systems: MAIL_USERNAME / MAIL_PASSWORD and, if you want the Google Calendar
 # integration, GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET. Those stay in the compose file.
 #
-# One value pair needs a follow-up step. PASSPORT_PERSONAL_ACCESS_CLIENT_ID and
-# _SECRET are not read back from the app - they are inputs, and a matching row has to
-# exist in oauth_clients for the app to mint API tokens with them. The command to
-# create it is printed at the end and only needs running once, after the first boot.
+# One follow-up step remains, and it is printed at the end: the first user. Self-hosted
+# installs have no public sign-up, so a fresh database has no accounts and nothing can
+# log in until `php artisan admin:user:create` has run.
 #
-# The other follow-up step is the first user. Self-hosted installs have no public
-# sign-up, so a fresh database has no accounts and nothing can log in until
-# `php artisan admin:user:create` has run. That command is printed at the end too.
+# Nothing here covers the personal access client the API token screen mints tokens
+# through. Passport 13 finds it by querying oauth_clients rather than by configured id
+# and secret, so the app containers create the row themselves on boot.
 #
 # Do not regenerate this file for an existing installation:
 #   APP_KEY      decrypts every stored Jira and Google token - changing it orphans them.
@@ -41,7 +40,7 @@ while [ $# -gt 0 ]; do
             force=true
             ;;
         -h | --help)
-            sed -n '2,30p' "$0" | cut -c 3-
+            sed -n '2,28p' "$0" | cut -c 3-
             exit 0
             ;;
         -*)
@@ -83,28 +82,6 @@ random_alnum() {
     openssl rand -base64 "$((length * 2))" | tr -dc 'A-Za-z0-9' | cut -c "1-${length}"
 }
 
-# oauth_clients.id is a uuid column, so this has to be a real UUID rather than just a
-# random string.
-random_uuid() {
-    if [ -r /proc/sys/kernel/random/uuid ]; then
-        cat /proc/sys/kernel/random/uuid
-        return
-    fi
-
-    if command -v uuidgen > /dev/null 2>&1; then
-        uuidgen | tr 'A-F' 'a-f'
-        return
-    fi
-
-    local hex variant
-    hex="$(openssl rand -hex 16)"
-    # Version 4 in the 13th nibble, variant 10xx in the 17th.
-    variant="$(printf '%s' '89ab' | cut -c "$((0x${hex:16:1} % 4 + 1))")"
-    printf '%s-%s-4%s-%s%s-%s\n' \
-        "${hex:0:8}" "${hex:8:4}" "${hex:13:3}" \
-        "$variant" "${hex:17:3}" "${hex:20:12}"
-}
-
 # Compose expands \n inside a double quoted env_file value into a real newline, so the
 # PEM arrives in the container intact. Passport also un-escapes literal \n itself, so
 # this survives either way - including being pasted straight into a .env file.
@@ -123,8 +100,6 @@ openssl rsa -in "$keydir/oauth-private.key" -pubout -out "$keydir/oauth-public.k
 
 app_key="base64:$(openssl rand -base64 32)"
 db_password="$(random_alnum 40)"
-passport_client_id="$(random_uuid)"
-passport_client_secret="$(random_alnum 40)"
 passport_private_key="$(pem_to_single_line "$keydir/oauth-private.key")"
 passport_public_key="$(pem_to_single_line "$keydir/oauth-public.key")"
 
@@ -145,13 +120,6 @@ APP_KEY="${app_key}"
 DB_PASSWORD="${db_password}"
 POSTGRES_PASSWORD="${db_password}"
 
-# The personal access client the API token screen mints tokens through. Unlike the
-# other values these are inputs, not outputs: the app looks up a client with this id
-# and presents this secret, so the matching oauth_clients row has to exist. See the
-# bootstrap command printed by generate-secrets.sh.
-PASSPORT_PERSONAL_ACCESS_CLIENT_ID="${passport_client_id}"
-PASSPORT_PERSONAL_ACCESS_CLIENT_SECRET="${passport_client_secret}"
-
 # php artisan passport:keys, as single line PEMs. Identical across every container.
 PASSPORT_PRIVATE_KEY="${passport_private_key}"
 PASSPORT_PUBLIC_KEY="${passport_public_key}"
@@ -167,25 +135,13 @@ Still to fill in by hand, in docker-compose.prod.yml - nothing can generate them
     MAIL_HOST / MAIL_USERNAME / MAIL_PASSWORD / MAIL_FROM_ADDRESS
     GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET   (only if you want Google Calendar)
 
-Then bring the stack up - the app container runs the migrations on boot:
+Then bring the stack up. The app container migrates the database, creates the storage
+directories and creates the personal access client the API token screen needs, all on
+boot - none of it needs running by hand:
 
     docker compose -f docker-compose.prod.yml up -d
 
-Once postgres is up, create the personal access client row that
-PASSPORT_PERSONAL_ACCESS_CLIENT_ID refers to. Run this once, on first install; it is
-idempotent, so a repeat is harmless:
-
-    docker compose -f docker-compose.prod.yml exec -T pgsql \\
-        psql -v ON_ERROR_STOP=1 -U worklogd -d worklogd \\
-        -c "INSERT INTO oauth_clients (id, name, secret, provider, grant_types, redirect_uris, revoked, created_at, updated_at) VALUES ('${passport_client_id}', 'API', '${passport_client_secret}', 'users', '[\\"personal_access\\"]', '[]', false, now(), now()) ON CONFLICT (id) DO NOTHING;"
-
-Skip it and the app works, but "Create API token" in Profile Settings fails with
-"personal access client is not configured".
-
-Do not run 'php artisan db:seed' to create it. That seeder wipes every table first
-and replaces them with demo organizations - it is for development only.
-
-Finally, create the first user. There is no sign-up on a self-hosted install -
+One thing is left. Create the first user: there is no sign-up on a self-hosted install -
 APP_ENABLE_REGISTRATION is off in the example stack, so the database starts empty and
 nothing can log in until this has run:
 
