@@ -76,6 +76,28 @@ const labelColor = useCssVariable('--color-text-secondary');
 const markLineColor = useCssVariable('--color-border-secondary');
 const splitLineColor = useCssVariable('--color-border-tertiary');
 
+const HOUR_IN_SECONDS = 3600;
+
+/**
+ * Rough hour gridlines for the y axis.
+ *
+ * The series is in seconds, so left to itself echarts picks tidy *second* values - 5000, 10000 -
+ * which read as noise. Choosing an hour step keeps every label a whole number of hours, and the
+ * ladder keeps the count of lines roughly constant whether the range holds one day or a year.
+ */
+const Y_AXIS_STEPS_IN_HOURS = [1, 2, 4, 8, 12, 24, 48, 96, 168, 336, 720];
+const MAX_Y_AXIS_LINES = 4;
+
+const yAxisIntervalInSeconds = computed(() => {
+    const maxSeconds = Math.max(0, ...(props.groupedData?.map((el) => el.seconds ?? 0) ?? []));
+    const maxHours = maxSeconds / HOUR_IN_SECONDS;
+    const step =
+        Y_AXIS_STEPS_IN_HOURS.find((candidate) => maxHours / candidate <= MAX_Y_AXIS_LINES) ??
+        Math.ceil(maxHours / MAX_Y_AXIS_LINES);
+
+    return Math.max(1, step) * HOUR_IN_SECONDS;
+});
+
 const seriesData = computed(() => {
     return props?.groupedData?.map((el) => {
         return {
@@ -129,7 +151,8 @@ const option = computed(() => ({
         top: 0,
         right: 0,
         bottom: 50,
-        left: 0,
+        // Room for the y axis labels, which are drawn outside the grid
+        left: 44,
     },
     backgroundColor: 'transparent',
     xAxis: {
@@ -157,8 +180,16 @@ const option = computed(() => ({
     },
     yAxis: {
         type: 'value',
+        interval: yAxisIntervalInSeconds.value,
         axisLabel: {
-            show: false,
+            show: true,
+            fontSize: 12,
+            fontWeight: 400,
+            color: labelColor.value,
+            margin: 12,
+            fontFamily: 'Inter, sans-serif',
+            // Whole hours, because interval is a multiple of an hour - so no rounding happens here
+            formatter: (value: number) => Math.round(value / HOUR_IN_SECONDS) + 'h',
         },
         splitLine: {
             lineStyle: {
