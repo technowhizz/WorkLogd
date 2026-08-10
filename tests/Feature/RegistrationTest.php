@@ -16,6 +16,7 @@ use App\Service\IpLookup\IpLookupServiceContract;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Laravel\Fortify\Features;
 use Tests\TestCaseWithDatabase;
 use TiMacDonald\Log\LogEntry;
@@ -64,6 +65,18 @@ class RegistrationTest extends TestCaseWithDatabase
         $this->assertSame($organization->getKey(), $user->current_team_id);
     }
 
+    public function test_registration_screen_is_not_available_if_registration_is_deactivated(): void
+    {
+        // Arrange
+        Config::set('app.enable_registration', false);
+
+        // Act
+        $response = $this->get('/register');
+
+        // Assert
+        $response->assertNotFound();
+    }
+
     public function test_user_registration_fails_if_registration_is_deactivated(): void
     {
         // Arrange
@@ -82,11 +95,84 @@ class RegistrationTest extends TestCaseWithDatabase
         ]);
 
         // Assert
+        $response->assertNotFound();
+        $this->assertFalse(User::query()->where('email', 'test@example.com')->exists());
+        Event::assertNotDispatched(NewsletterRegistered::class);
+    }
+
+    public function test_invited_user_can_register_if_registration_is_deactivated(): void
+    {
+        // Arrange
+        $user = $this->createUserWithPermission();
+        $invitation = OrganizationInvitation::factory()
+            ->forOrganization($user->organization)
+            ->role(Role::Employee)
+            ->create([
+                'email' => 'invited@example.com',
+            ]);
+        Config::set('app.enable_registration', false);
+        $acceptUrl = URL::to(URL::temporarySignedRoute(
+            'organization-invitations.accept',
+            now()->addMinutes(60),
+            [$invitation->getKey()],
+            false
+        ));
+
+        // Act
+        $accept = $this->get($acceptUrl);
+        $screen = $this->get('/register');
+        $response = $this->post('/register', [
+            'name' => 'Invited User',
+            'email' => 'invited@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'terms' => true,
+        ]);
+
+        // Assert
+        $accept->assertRedirect(route('register'));
+        $screen->assertStatus(200);
+        $response->assertRedirect(RouteServiceProvider::HOME);
+        $this->assertAuthenticated();
+        $newUser = User::query()->where('email', 'invited@example.com')->firstOrFail();
+        $organizations = $newUser->organizations;
+        $this->assertCount(1, $organizations);
+        $this->assertSame($user->organization->getKey(), $organizations->first()->getKey());
+    }
+
+    public function test_registration_fails_for_an_email_that_was_not_invited_if_registration_is_deactivated(): void
+    {
+        // Arrange
+        $user = $this->createUserWithPermission();
+        $invitation = OrganizationInvitation::factory()
+            ->forOrganization($user->organization)
+            ->role(Role::Employee)
+            ->create([
+                'email' => 'invited@example.com',
+            ]);
+        Config::set('app.enable_registration', false);
+        $acceptUrl = URL::to(URL::temporarySignedRoute(
+            'organization-invitations.accept',
+            now()->addMinutes(60),
+            [$invitation->getKey()],
+            false
+        ));
+        $this->get($acceptUrl);
+
+        // Act: the invitation link opens the screen, but only for the invited email
+        $response = $this->post('/register', [
+            'name' => 'Someone Else',
+            'email' => 'someone.else@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'terms' => true,
+        ]);
+
+        // Assert
         $response->assertInvalid([
             'email' => 'Registration is disabled.',
         ]);
-        $this->assertFalse(User::query()->where('email', 'test@example.com')->exists());
-        Event::assertNotDispatched(NewsletterRegistered::class);
+        $this->assertFalse(User::query()->where('email', 'someone.else@example.com')->exists());
     }
 
     public function test_new_user_can_not_register_with_likely_invalid_domain(): void

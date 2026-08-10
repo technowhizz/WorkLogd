@@ -9,6 +9,7 @@ import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 
 defineProps({
     canResetPassword: Boolean,
+    canRegister: Boolean,
     status: String,
 });
 
@@ -44,6 +45,7 @@ const page = usePage<{
 
         <template #actions>
             <Link
+                v-if="canRegister"
                 class="py-8 text-text-secondary text-sm font-medium opacity-90 hover:opacity-100 transition"
                 :href="route('register')">
                 No account yet? <span class="text-text-primary">Register here!</span>

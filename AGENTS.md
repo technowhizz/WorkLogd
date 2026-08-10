@@ -96,6 +96,14 @@ directory. Build features in `app/`, not as an extension.
 - **No policies.** Authorization is `app/Service/PermissionStore.php` (hardcoded `ROLE_DEFINITIONS`);
   controllers call `$this->checkPermission($organization, 'time-entries:create:own')`. User-scoped,
   organization-independent endpoints (API tokens, integrations) do **no** permission checks.
+- **Public sign-up is gated by `APP_ENABLE_REGISTRATION`** (off by default, on in `.env.example`).
+  `EnsureRegistrationIsEnabled` is registered on the Fortify route group in `config/fortify.php` and
+  404s the sign-up screen; `CreateNewUser` then decides who may actually register. Keep
+  `Features::registration()` enabled either way — dropping it takes the `register` route *name* with
+  it, which both the invitation redirect and Ziggy's client-side `route('register')` need. Fortify
+  names only the GET route and leaves the POST unnamed, so the middleware matches on the URI.
+  Invited people are the exception and can register while it is off, checked against the invitations
+  table rather than the session flag that reveals the screen.
 - API errors extend `app/Exceptions/Api/ApiException.php` → renders **400** with `{error, key, message}`,
   message in `lang/en/exceptions.php`.
 - Timestamps in API requests are strictly `date_format:Y-m-d\TH:i:s\Z` — UTC, no offsets.

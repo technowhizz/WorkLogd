@@ -7,6 +7,7 @@ namespace App\Actions\Fortify;
 use App\Enums\Weekday;
 use App\Events\NewsletterRegistered;
 use App\Models\User;
+use App\Service\InvitationService;
 use App\Service\IpLookup\IpLookupServiceContract;
 use App\Service\TimezoneService;
 use App\Service\UserService;
@@ -31,10 +32,18 @@ class CreateNewUser implements CreatesNewUsers
      */
     public function create(array $input): User
     {
+        // Registration off still lets an invited person create the account they need to accept
+        // the invitation with. Checked against the invitations table rather than the session
+        // flag the sign-up screen is revealed by, so holding an invitation for one email does
+        // not open registration for another.
         if (! config('app.enable_registration')) {
-            throw ValidationException::withMessages([
-                'email' => [__('Registration is disabled.')],
-            ]);
+            $email = is_string($input['email'] ?? null) ? $input['email'] : '';
+
+            if (! app(InvitationService::class)->hasInvitationFor($email)) {
+                throw ValidationException::withMessages([
+                    'email' => [__('Registration is disabled.')],
+                ]);
+            }
         }
 
         Validator::make($input, [

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\EnsureRegistrationIsEnabled;
 use App\Providers\RouteServiceProvider;
 use Laravel\Fortify\Features;
 
@@ -104,7 +105,9 @@ return [
     |
     */
 
-    'middleware' => ['web'],
+    // EnsureRegistrationIsEnabled applies to the register routes only - it is here rather than
+    // on the route because Fortify declares its own routes and takes no per-route middleware.
+    'middleware' => ['web', EnsureRegistrationIsEnabled::class],
 
     /*
     |--------------------------------------------------------------------------

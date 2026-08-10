@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Web;
 use App\Enums\Role;
 use App\Models\OrganizationInvitation;
 use App\Models\User;
+use App\Service\InvitationService;
 use App\Service\MemberService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -14,7 +15,7 @@ use RuntimeException;
 
 class OrganizationInvitationController extends Controller
 {
-    public function accept(OrganizationInvitation $invitation, MemberService $memberService): RedirectResponse
+    public function accept(OrganizationInvitation $invitation, MemberService $memberService, InvitationService $invitationService): RedirectResponse
     {
         $email = strtolower($invitation->email);
         $role = Role::tryFrom($invitation->role);
@@ -34,6 +35,10 @@ class OrganizationInvitationController extends Controller
                 $invitation->accepted_at = now();
                 $invitation->save();
             }
+
+            // Opens the sign-up screen for this browser even when public registration is off,
+            // which is the only way an invited person can create the account they need.
+            $invitationService->rememberInviteeForRegistration($email);
 
             return redirect(route('register'))
                 ->with('bannerText', __('Please create an account to finish joining the :organization organization.', [

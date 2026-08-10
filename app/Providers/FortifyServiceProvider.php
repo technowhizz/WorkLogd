@@ -54,6 +54,9 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::loginView(function () {
             return Inertia::render('Auth/Login', [
                 'canResetPassword' => Route::has('password.request'),
+                // The route always exists (see EnsureRegistrationIsEnabled), so this asks the
+                // setting rather than Route::has(). Invited people arrive by their own link.
+                'canRegister' => (bool) config('app.enable_registration'),
                 'status' => session('status'),
             ]);
         });
