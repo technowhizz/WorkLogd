@@ -279,6 +279,40 @@ class JiraSyncServiceTest extends TestCaseWithDatabase
         $this->assertSame(['unchanged'], $actions);
     }
 
+    public function test_status_for_marks_a_reworded_entry_as_outdated_not_pending(): void
+    {
+        // Arrange
+        // The dot has to agree with the plan: the plan calls this an update, so the entry has a
+        // live worklog that is merely stale, which is what outdated means everywhere else.
+        $timeEntry = $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+        $this->syncAndFake('10001');
+        $timeEntry->description = 'PROJ-1 fix the login redirect';
+        $timeEntry->save();
+
+        // Act
+        $statuses = $this->service()->statusFor($this->user, $this->organization, '2026-08-05', '2026-08-05');
+
+        // Assert
+        $this->assertSame('outdated', $statuses[$timeEntry->getKey()]['state']);
+        $this->assertSame('PROJ-1', $statuses[$timeEntry->getKey()]['issue_key']);
+    }
+
+    public function test_status_for_still_reports_pending_when_the_ticket_changed(): void
+    {
+        // Arrange
+        // Different ticket is different work: there is nothing in Jira for it yet.
+        $timeEntry = $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+        $this->syncAndFake('10001');
+        $timeEntry->description = 'PROJ-2 fix login';
+        $timeEntry->save();
+
+        // Act
+        $statuses = $this->service()->statusFor($this->user, $this->organization, '2026-08-05', '2026-08-05');
+
+        // Assert
+        $this->assertSame('pending', $statuses[$timeEntry->getKey()]['state']);
+    }
+
     public function test_plan_reports_why_each_entry_was_skipped(): void
     {
         // Arrange
