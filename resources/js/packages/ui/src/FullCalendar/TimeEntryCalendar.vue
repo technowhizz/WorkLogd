@@ -52,6 +52,7 @@ import { DEFAULT_PIXELS_PER_HOUR } from './calendarSettings';
 import { useCalendarGrid } from './useCalendarGrid';
 import { useCalendarZoom } from './useCalendarZoom';
 import { useCalendarNavigation } from './useCalendarNavigation';
+import { createCalendarKeyboardNavigation } from './calendarKeyboardNavigation';
 import { useCalendarEvents } from './useCalendarEvents';
 import { getChipColors } from './eventColors';
 import { getNoProjectColor } from '../utils/settings';
@@ -525,8 +526,18 @@ watch(
     { flush: 'post' }
 );
 
+/*
+ * Arrow keys page the calendar. Bound for as long as the calendar is mounted, which is what keeps
+ * the bindings from leaking into the rest of the app.
+ */
+const keyboardNavigation = createCalendarKeyboardNavigation({
+    onPrev: handlePrev,
+    onNext: handleNext,
+});
+
 onMounted(() => {
     emitDatesChange();
+    keyboardNavigation.listen();
     currentTimeInterval = setInterval(() => {
         currentTime.value = getLocalizedDayJs();
     }, 60000);
@@ -541,6 +552,7 @@ onDeactivated(() => {
 });
 
 onUnmounted(() => {
+    keyboardNavigation.stop();
     if (currentTimeInterval) {
         clearInterval(currentTimeInterval);
         currentTimeInterval = null;

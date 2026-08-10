@@ -308,6 +308,52 @@ test('test that calendar navigation buttons work', async ({ page }) => {
     await expect(page.locator('.fc')).toBeVisible();
 });
 
+test('test that the arrow keys page the calendar the same way the buttons do', async ({ page }) => {
+    // Arrange
+    await goToCalendar(page);
+    await expect(page.locator('.fc')).toBeVisible();
+    const startTitle = await getCalendarTitle(page).textContent();
+    // The week the buttons land on is the week the keys must land on too
+    await page.getByRole('button', { name: 'Next' }).click();
+    const nextWeekTitle = await getCalendarTitle(page).textContent();
+    await page.getByRole('button', { name: 'Previous' }).click();
+    await expect(getCalendarTitle(page)).toHaveText(startTitle ?? '');
+    const firstColumn = () => page.locator('.fc-col-header-cell').first();
+    const startFirstDay = await firstColumn().getAttribute('data-date');
+
+    // Act
+    await page.keyboard.press('ArrowRight');
+
+    // Assert: one week forward, by column date rather than title - the title only names the month
+    await expect(firstColumn()).not.toHaveAttribute('data-date', startFirstDay ?? '');
+    await expect(getCalendarTitle(page)).toHaveText(nextWeekTitle ?? '');
+
+    // Act
+    await page.keyboard.press('ArrowLeft');
+
+    // Assert: back where it started
+    await expect(firstColumn()).toHaveAttribute('data-date', startFirstDay ?? '');
+});
+
+test('test that the arrow keys are left alone while a dialog is open', async ({ page, ctx }) => {
+    // Arrange
+    const description = 'Arrow keys ignored ' + Math.floor(1 + Math.random() * 10000);
+    await createBareTimeEntryViaApi(ctx, description, '1h');
+    await goToCalendar(page);
+    const firstColumn = () => page.locator('.fc-col-header-cell').first();
+    const startFirstDay = await firstColumn().getAttribute('data-date');
+
+    // Act: the edit dialog owns the keyboard while it is open
+    const event = page.locator('.fc-event').filter({ hasText: description }).first();
+    await scrollIntoViewCentred(event);
+    await event.click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.keyboard.press('ArrowRight');
+
+    // Assert: the week has not moved
+    await expect(firstColumn()).toHaveAttribute('data-date', startFirstDay ?? '');
+});
+
 test('test that editing time entry description via calendar modal works', async ({ page, ctx }) => {
     const originalDescription = 'Edit me in calendar ' + Math.floor(1 + Math.random() * 10000);
     const updatedDescription = 'Updated in calendar ' + Math.floor(1 + Math.random() * 10000);
