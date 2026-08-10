@@ -168,9 +168,10 @@ function onSelectChange(checked: boolean) {
                                     @click="expanded = !expanded">
                                     {{ timeEntry?.timeEntries?.length }}
                                 </GroupedItemsCountButton>
+                                <!-- Midway between the count and the description: see TimeEntryRow -->
                                 <ExternalSyncIndicator
                                     :badge="aggregateSyncBadge"
-                                    class="mx-2 shrink-0" />
+                                    class="ml-3.5 mr-0.5 shrink-0" />
                                 <TimeEntryDescriptionInput
                                     v-if="timeEntry.type !== 'break'"
                                     class="min-w-0 mr-4 shrink"
@@ -278,9 +279,10 @@ function onSelectChange(checked: boolean) {
                                         @click="expanded = !expanded">
                                         {{ timeEntry?.timeEntries?.length }}
                                     </GroupedItemsCountButton>
+                                    <!-- Mobile: the input's padding is pl-1.5 rather than pl-3 -->
                                     <ExternalSyncIndicator
                                         :badge="aggregateSyncBadge"
-                                        class="mx-2 shrink-0" />
+                                        class="ml-2 mr-0.5 shrink-0" />
                                     <TimeEntryDescriptionInput
                                         class="min-w-0 flex-1"
                                         :model-value="timeEntry.description"

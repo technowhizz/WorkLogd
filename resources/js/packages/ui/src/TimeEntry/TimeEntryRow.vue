@@ -157,9 +157,15 @@ async function handleDeleteTimeEntry() {
                         <div class="hidden @lg:flex items-center min-w-0">
                             <Checkbox :checked="selected" @update:checked="onSelectChange" />
                             <div v-if="indent === true" class="w-10 h-7"></div>
+                            <!--
+                                Asymmetric on purpose, so the dot lands midway between the checkbox
+                                and where the description *reads* from: the input carries its own
+                                left padding (pl-3 here, pl-1.5 on mobile), which adds to the gap on
+                                the right. Equal margins put the dot 12px left of centre.
+                            -->
                             <ExternalSyncIndicator
                                 :badge="syncBadge ?? null"
-                                class="mx-2 shrink-0" />
+                                class="ml-3.5 mr-0.5 shrink-0" />
                             <TimeEntryDescriptionInput
                                 v-if="!isBreak"
                                 class="min-w-0 mr-4 shrink"
@@ -235,9 +241,10 @@ async function handleDeleteTimeEntry() {
                         <div class="@lg:hidden">
                             <!-- First row: description + duration -->
                             <div class="flex items-center justify-between min-w-0">
+                                <!-- Mobile: nothing to its left, and the input's padding is pl-1.5 -->
                                 <ExternalSyncIndicator
                                     :badge="syncBadge ?? null"
-                                    class="mx-2 shrink-0" />
+                                    class="ml-2 mr-0.5 shrink-0" />
                                 <TimeEntryDescriptionInput
                                     v-if="!isBreak"
                                     class="min-w-0 flex-1"
