@@ -344,9 +344,28 @@ class JiraSyncService
         $movedWorklogs = $this->worklogsMatchingGroupEntries($user, $organization, $grouping->groups, $worklogs);
         $matching = $this->matchWorklogsToGroups($grouping->groups, $worklogs, $movedWorklogs);
 
+        /*
+         * Entries some worklog remembers being built from. A group the matcher could not pair can
+         * still contain them - the one edit matching refuses to follow is a ticket change, since
+         * Jira cannot move a worklog between issues. To the person looking at the dot that entry
+         * is not new work: it was logged, and they changed it. "Outdated" is the truthful state;
+         * "pending" would hide that the edit disturbed something already in Jira.
+         */
+        $previouslyLoggedEntryIds = [];
+        foreach ([$worklogs, $movedWorklogs] as $collection) {
+            foreach ($collection as $worklog) {
+                foreach ($worklog->time_entry_ids ?? [] as $timeEntryId) {
+                    $previouslyLoggedEntryIds[$timeEntryId] = true;
+                }
+            }
+        }
+
         foreach ($grouping->groups as $group) {
             $existing = $matching['matches'][$group->groupHash] ?? null;
+            $wasLoggedBefore = $existing === null
+                && array_intersect_key(array_flip($group->timeEntryIds), $previouslyLoggedEntryIds) !== [];
             $state = match (true) {
+                $wasLoggedBefore => 'outdated',
                 $existing === null => 'pending',
                 $existing->group_hash !== $group->groupHash => 'outdated',
                 $this->isUpToDate($existing, $group) => 'synced',

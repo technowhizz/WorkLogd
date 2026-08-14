@@ -447,10 +447,11 @@ class JiraSyncServiceTest extends TestCaseWithDatabase
         $this->assertSame('PROJ-1', $statuses[$timeEntry->getKey()]['issue_key']);
     }
 
-    public function test_status_for_still_reports_pending_when_the_ticket_changed(): void
+    public function test_status_for_marks_a_ticket_change_as_outdated_not_pending(): void
     {
         // Arrange
-        // Different ticket is different work: there is nothing in Jira for it yet.
+        // The sync will delete and recreate - Jira cannot move a worklog between issues - but to
+        // the person looking at the dot this is not new work: it was logged, and they changed it.
         $timeEntry = $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
         $this->syncAndFake('10001');
         $timeEntry->description = 'PROJ-2 fix login';
@@ -460,7 +461,22 @@ class JiraSyncServiceTest extends TestCaseWithDatabase
         $statuses = $this->service()->statusFor($this->user, $this->organization, '2026-08-05', '2026-08-05');
 
         // Assert
-        $this->assertSame('pending', $statuses[$timeEntry->getKey()]['state']);
+        $this->assertSame('outdated', $statuses[$timeEntry->getKey()]['state']);
+        $this->assertSame('PROJ-2', $statuses[$timeEntry->getKey()]['issue_key']);
+    }
+
+    public function test_status_for_reports_truly_new_work_as_pending(): void
+    {
+        // Arrange: one entry synced, a second that has never been anywhere near Jira
+        $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
+        $this->syncAndFake('10001');
+        $newEntry = $this->timeEntry('PROJ-3 brand new work', '2026-08-05T14:00:00', '2026-08-05T15:00:00');
+
+        // Act
+        $statuses = $this->service()->statusFor($this->user, $this->organization, '2026-08-05', '2026-08-05');
+
+        // Assert: never logged means pending - outdated is reserved for disturbed work
+        $this->assertSame('pending', $statuses[$newEntry->getKey()]['state']);
     }
 
     public function test_plan_reports_why_each_entry_was_skipped(): void

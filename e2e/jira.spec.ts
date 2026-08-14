@@ -759,6 +759,45 @@ test('test that the calendar shows pending, synced and outdated states', async (
         2
     );
     await expect(page.getByTestId('sync_indicator_synced').locator('visible=true')).toHaveCount(0);
+    // And the day is no longer fully logged, so its header dot goes back to grey
+    await expect(todayHeaderDot).toHaveAttribute('data-sync-state', 'attention');
+});
+
+test('test that changing the ticket number reads as outdated, not as never logged', async ({
+    page,
+}) => {
+    // Arrange
+    const ctx = await jiraOrganization(page);
+    await connectJiraViaApi(ctx);
+    const today = localDate();
+    const entry = await createTimeEntryWithTimestampsViaApi(ctx, {
+        start: localTimestamp(today, 9),
+        end: localTimestamp(today, 10),
+        description: 'PROJ-1 wears the wrong ticket',
+    });
+    await runJiraSyncViaApi(ctx, today, today);
+
+    // Act: the sync will have to delete and recreate - Jira cannot move a worklog between
+    // issues - but the dot must say "changed", because this work was logged and got edited
+    const response = await ctx.request.put(
+        `${PLAYWRIGHT_BASE_URL}/api/v1/organizations/${ctx.orgId}/time-entries/${entry.id}`,
+        {
+            data: {
+                member_id: ctx.memberId,
+                start: localTimestamp(today, 9),
+                end: localTimestamp(today, 10),
+                description: 'PROJ-2 wears the wrong ticket',
+            },
+        }
+    );
+    expect(response.status()).toBe(200);
+    await page.goto(PLAYWRIGHT_BASE_URL + '/calendar');
+
+    // Assert: amber "changed since logged", not a hollow "never logged"
+    const dot = page.getByTestId('sync_indicator_outdated').locator('visible=true');
+    await expect(dot).toHaveCount(1);
+    await expect(dot).toHaveAttribute('aria-label', /Changed since it was logged/);
+    await expect(page.getByTestId('sync_indicator_pending').locator('visible=true')).toHaveCount(0);
 });
 
 test('test that the time list and the timesheet show the same sync states', async ({ page }) => {
