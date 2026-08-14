@@ -735,6 +735,11 @@ test('test that the calendar shows pending, synced and outdated states', async (
     // Assert: a ticketed entry nothing has been logged for is pending, a hollow dot
     await expect(page.getByTestId('sync_indicator_pending').locator('visible=true')).toHaveCount(1);
     await expect(page.getByTestId('sync_indicator_synced').locator('visible=true')).toHaveCount(0);
+    // The day header summarises: something on this day still needs logging
+    const todayHeaderDot = page
+        .locator(`.fc-col-header-cell[data-date="${today}"]`)
+        .getByTestId('day_sync_indicator');
+    await expect(todayHeaderDot).toHaveAttribute('data-sync-state', 'attention');
 
     // Act
     await openJiraSyncDialog(page);
@@ -745,6 +750,8 @@ test('test that the calendar shows pending, synced and outdated states', async (
     // Assert: the dots refresh from the run finishing, with no reload
     await expect(page.getByTestId('sync_indicator_synced').locator('visible=true')).toHaveCount(1);
     await expect(page.getByTestId('sync_indicator_pending').locator('visible=true')).toHaveCount(0);
+    // Everything on the day is logged now, so its header dot turns green - also without a reload
+    await expect(todayHeaderDot).toHaveAttribute('data-sync-state', 'synced');
 
     // Act: more time on the same ticket and day makes what Jira holds wrong rather than missing
     await createTimeEntryWithTimestampsViaApi(ctx, {

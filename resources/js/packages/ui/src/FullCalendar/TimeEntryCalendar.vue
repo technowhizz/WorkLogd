@@ -46,7 +46,7 @@ import {
 import { Coffee } from '@lucide/vue';
 import type { ActivityPeriod } from './activityTypes';
 import type { ExternalCalendarEvent } from './externalCalendarTypes';
-import type { ExternalSyncBadges } from '../TimeEntry/externalSyncTypes';
+import { worstExternalSyncBadge, type ExternalSyncBadges } from '../TimeEntry/externalSyncTypes';
 import { TIME_AXIS_WIDTH, type DayEvent } from './calendarTypes';
 import { DEFAULT_PIXELS_PER_HOUR } from './calendarSettings';
 import { useCalendarGrid } from './useCalendarGrid';
@@ -215,6 +215,34 @@ const {
     cssBackground,
     minutesToPixels,
     timeToMinutesFromMidnight,
+});
+
+/*
+ * One sync state per day for the header: 'synced' when everything with a badge that day is
+ * logged, 'attention' when anything is not, absent when the day has nothing to say - no
+ * badged entries, or the page tracks no external references at all. Collapsing through
+ * worstExternalSyncBadge keeps this in step with how rows and cells summarise groups.
+ */
+const dayHeaderSyncStates = computed<Record<string, 'synced' | 'attention'>>(() => {
+    const badges = props.externalSyncBadges;
+    if (!badges || Object.keys(badges).length === 0) {
+        return {};
+    }
+
+    const states: Record<string, 'synced' | 'attention'> = {};
+    for (const day of viewDays.value) {
+        const dayStr = day.format('YYYY-MM-DD');
+        // An entry clipped by midnight appears in both its days; the set keeps it counted once
+        const entryIds = [
+            ...new Set((eventsByDay.value[dayStr] ?? []).map((dayEvent) => dayEvent.event.id)),
+        ];
+        const worst = worstExternalSyncBadge(entryIds, badges);
+        if (worst !== null) {
+            states[dayStr] = worst.state === 'synced' ? 'synced' : 'attention';
+        }
+    }
+
+    return states;
 });
 
 const {
@@ -743,6 +771,9 @@ function getEventDurationSeconds(dayEvent: DayEvent, dayStr: string): number {
                                     :data-date="day.format('YYYY-MM-DD')">
                                     <FullCalendarDayHeader
                                         :date="day"
+                                        :sync-status="
+                                            dayHeaderSyncStates[day.format('YYYY-MM-DD')] ?? null
+                                        "
                                         :is-today="isToday(day)"
                                         :total-seconds="dailyTotals[day.format('YYYY-MM-DD')] || 0"
                                         :break-seconds="
