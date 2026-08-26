@@ -21,6 +21,7 @@ import { groupSimilarTimeEntriesSetting } from '@/utils/timeEntryGrouping';
 import { useTasksQuery } from '@/utils/useTasksQuery';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import TimeEntryGroupedTable from '@/packages/ui/src/TimeEntry/TimeEntryGroupedTable.vue';
+import { statusRangeForEntries } from '@/utils/jira';
 import { useJiraIndicators } from '@/utils/useJiraQuery';
 import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 import { useTagsQuery } from '@/utils/useTagsQuery';
@@ -49,24 +50,8 @@ const {
 
 const timeEntries = computed(() => data.value?.pages.flatMap((page) => page.data) || []);
 
-/*
- * This list scrolls back indefinitely, so the range follows what has actually been loaded,
- * clamped to the newest 62 days the status endpoint accepts. Entries older than that simply
- * carry no indicator, which reads as "not known" rather than as "nothing to do".
- */
-const MAX_STATUS_DAYS = 62;
-const jiraRange = computed<{ start: string | null; end: string | null }>(() => {
-    if (timeEntries.value.length === 0) {
-        return { start: null, end: null };
-    }
-    const dates = timeEntries.value.map((entry: TimeEntry) =>
-        getLocalizedDayJs(entry.start).format('YYYY-MM-DD')
-    );
-    const end = dates.reduce((a: string, b: string) => (a > b ? a : b));
-    const earliest = dates.reduce((a: string, b: string) => (a < b ? a : b));
-    const clamped = getLocalizedDayJs(end).subtract(MAX_STATUS_DAYS, 'day').format('YYYY-MM-DD');
-    return { start: earliest > clamped ? earliest : clamped, end };
-});
+// This list scrolls back indefinitely, so the range follows what has actually been loaded
+const jiraRange = computed(() => statusRangeForEntries(timeEntries.value));
 const jiraStartDate = computed(() => jiraRange.value.start);
 const jiraEndDate = computed(() => jiraRange.value.end);
 const { isJiraEnabled, externalSyncBadges } = useJiraIndicators(

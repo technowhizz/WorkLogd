@@ -9,6 +9,15 @@ import {
     createTimeEntryWithTagViaApi,
     createBareTimeEntryViaApi,
 } from './utils/api';
+import { createTimeEntryWithTimestampsViaApi } from './utils/api';
+import {
+    JIRA_SITE_URL,
+    connectJiraViaApi,
+    localDate,
+    localTimestamp,
+    runJiraSyncViaApi,
+    setJiraSiteUrlViaApi,
+} from './utils/jira';
 
 // Each test registers a new user and creates test data via API
 test.describe.configure({ timeout: 30000 });
@@ -910,4 +919,40 @@ test.describe('Reporting Detailed Pagination', () => {
         ]);
         await expect(page.getByTestId('pagination_range')).toHaveText('Entries 1–17 of 17');
     });
+});
+
+// ──────────────────────────────────────────────────
+// Jira sync dots
+// ──────────────────────────────────────────────────
+
+test('test that the detailed report shows the same jira sync dots as the time page', async ({
+    page,
+    ctx,
+}) => {
+    // Arrange: one entry logged to Jira, one still waiting
+    await setJiraSiteUrlViaApi(ctx, JIRA_SITE_URL);
+    await connectJiraViaApi(ctx);
+    const today = localDate();
+    await createTimeEntryWithTimestampsViaApi(ctx, {
+        start: localTimestamp(today, 9),
+        end: localTimestamp(today, 10),
+        description: 'PROJ-1 already in jira',
+    });
+    await runJiraSyncViaApi(ctx, today, today);
+    await createTimeEntryWithTimestampsViaApi(ctx, {
+        start: localTimestamp(today, 11),
+        end: localTimestamp(today, 12),
+        description: 'PROJ-2 not sent yet',
+    });
+
+    // Act
+    await goToReportingDetailed(page);
+
+    // Assert: one green, one hollow - the same vocabulary as the time page and timesheet
+    await expect(page.getByTestId('sync_indicator_synced').locator('visible=true')).toHaveCount(1);
+    await expect(page.getByTestId('sync_indicator_pending').locator('visible=true')).toHaveCount(1);
+    await expect(page.getByTestId('sync_indicator_synced').locator('visible=true')).toHaveAttribute(
+        'aria-label',
+        /Logged in Jira/
+    );
 });

@@ -306,6 +306,29 @@ export function issueBrowseUrl(
     return `${site}/browse/${encodeURIComponent(key)}`;
 }
 
+/** The longest range the sync-status endpoint accepts, mirroring JiraSyncRangeRequest. */
+export const MAX_STATUS_DAYS = 62;
+
+/**
+ * The local date range to ask the status endpoint about, derived from whatever entries a page
+ * has loaded and clamped to the newest MAX_STATUS_DAYS the endpoint accepts. Entries older than
+ * that simply carry no indicator, which reads as "not known" rather than as "nothing to do".
+ */
+export function statusRangeForEntries(entries: { start: string }[]): {
+    start: string | null;
+    end: string | null;
+} {
+    if (entries.length === 0) {
+        return { start: null, end: null };
+    }
+    const dates = entries.map((entry) => getLocalizedDayJs(entry.start).format('YYYY-MM-DD'));
+    const end = dates.reduce((a, b) => (a > b ? a : b));
+    const earliest = dates.reduce((a, b) => (a < b ? a : b));
+    const clamped = getLocalizedDayJs(end).subtract(MAX_STATUS_DAYS, 'day').format('YYYY-MM-DD');
+
+    return { start: earliest > clamped ? earliest : clamped, end };
+}
+
 /** Parses the organization's comma separated allow list, matching JiraConfig::parseProjectKeys. */
 export function parseProjectKeys(value: string | null | undefined): string[] {
     return (value ?? '')

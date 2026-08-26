@@ -41,7 +41,13 @@ import { useClientsStore } from '@/utils/useClients';
 import { getOrganizationCurrencyString } from '@/utils/money';
 import { useMembersQuery } from '@/utils/useMembersQuery';
 import { useQueryClient } from '@tanstack/vue-query';
-import { getCurrentOrganizationId, getCurrentMembershipId } from '@/utils/useUser';
+import {
+    getCurrentOrganizationId,
+    getCurrentMembershipId,
+    getCurrentUserId,
+} from '@/utils/useUser';
+import { statusRangeForEntries } from '@/utils/jira';
+import { useJiraIndicators } from '@/utils/useJiraQuery';
 import ReportingTabNavbar from '@/Components/Common/Reporting/ReportingTabNavbar.vue';
 import UpgradeModal from '@/Components/Common/UpgradeModal.vue';
 import type { ExportFormat } from '@/types/reporting';
@@ -173,6 +179,20 @@ async function deleteTimeEntries(timeEntries: TimeEntry[]) {
 const timeEntries = computed(() => {
     return timeEntryResponse?.value?.data || [];
 });
+
+/*
+ * The sync dots, as on the time page. Two reporting-specific touches: the range follows whatever
+ * the filters returned, clamped to what the status endpoint accepts, and only the current user's
+ * entries are offered to the missing-ticket detection - this page can list colleagues' work, and
+ * their descriptions are not this user's to judge. The server-side states need no such filter,
+ * because they are keyed by the current user's own entry ids.
+ */
+const jiraRange = computed(() => statusRangeForEntries(timeEntries.value));
+const jiraStartDate = computed(() => jiraRange.value.start);
+const jiraEndDate = computed(() => jiraRange.value.end);
+const { isJiraEnabled, externalSyncBadges } = useJiraIndicators(jiraStartDate, jiraEndDate, () =>
+    timeEntries.value.filter((entry: TimeEntry) => entry.user_id === getCurrentUserId())
+);
 
 onMounted(async () => {
     await updateFilteredTimeEntries();
@@ -415,6 +435,8 @@ async function downloadExport(format: ExportFormat) {
                     is-report
                     show-date
                     show-member
+                    :sync-badge="externalSyncBadges?.[entry.id] ?? null"
+                    :reserve-sync-indicator="isJiraEnabled"
                     :time-entry="entry"
                     @selected="selectedTimeEntries.push(entry)"
                     @unselected="
