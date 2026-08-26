@@ -149,7 +149,7 @@ class JiraSyncService
      * place. Jira treats a delete-and-recreate as a different worklog (new id, new place in the
      * issue's history, anything attached to it gone), so matching errs towards updating.
      *
-     * Three passes, each over what the one before left unmatched:
+     * Two passes, the second over what the first left unmatched:
      *
      *  1. Exact group hash - unchanged content, the common case. Running this first is also what
      *     makes rewriting a row's hash in place safe against the unique index: an update can only
@@ -161,8 +161,11 @@ class JiraSyncService
      *     most shared entries, then matching comment, then matching day, so when one worklog's
      *     entries split into two groups the untouched group keeps the worklog and the edited one
      *     creates. Deterministic order throughout, so the same data always plans the same way.
-     *  3. The ticket-and-day heuristic, only for rows that predate stored ids and so offer
-     *     nothing better to go on. Every sync stamps ids, so this pass retires itself.
+     *
+     * There was once a third pass - a ticket-and-day heuristic for rows from before ids were
+     * stored. It retired itself: every sync stamps ids onto the rows it sees, and once no
+     * id-less row remained it matched nothing. A row without ids today simply hash-matches
+     * while unchanged, is stamped by its next sync, and orphans if edited before one runs.
      *
      * Shared by plan() and statusFor() so the preview and the dots cannot disagree.
      *
@@ -241,32 +244,6 @@ class JiraSyncService
             $matches[$group->groupHash] = $pair['worklog'];
             $matchedRowIds[$pair['worklog']->getKey()] = true;
             unset($unmatchedGroups[$pair['groupIndex']]);
-        }
-
-        // Pass 3: rows from before ids were stored - the ticket-and-day heuristic is all they have
-        $legacySpare = [];
-        foreach ($worklogs as $worklog) {
-            if (isset($matchedRowIds[$worklog->getKey()]) || $worklog->time_entry_ids !== null) {
-                continue;
-            }
-
-            $legacySpare[$worklog->issue_key."\0".$worklog->work_date->format('Y-m-d')][] = $worklog;
-        }
-        // The same data has to pair the same way, whatever order the rows came back in
-        foreach ($legacySpare as &$candidates) {
-            usort($candidates, static fn (JiraWorklog $a, JiraWorklog $b): int => [$a->comment ?? '', $a->jira_worklog_id] <=> [$b->comment ?? '', $b->jira_worklog_id]);
-        }
-        unset($candidates);
-
-        foreach ($unmatchedGroups as $group) {
-            $key = $group->issueKey."\0".$group->workDate;
-            if (($legacySpare[$key] ?? []) === []) {
-                continue;
-            }
-
-            $worklog = array_shift($legacySpare[$key]);
-            $matches[$group->groupHash] = $worklog;
-            $matchedRowIds[$worklog->getKey()] = true;
         }
 
         $orphans = [];
@@ -431,8 +408,8 @@ class JiraSyncService
      *
      * Creates and updates record membership as they write, but an untouched worklog never reaches
      * applyItem - actionableItems() filters it - so a pre-migration row that is simply up to date
-     * would stay id-less forever, stuck on the legacy ticket-and-day matching. Stamping it here
-     * means one ordinary sync upgrades every live row.
+     * would stay id-less forever. Stamping it here means one ordinary sync upgrades every
+     * live row.
      */
     private function stampMembershipOnUnchangedRows(User $user, Organization $organization, JiraSyncPlanDto $plan): void
     {

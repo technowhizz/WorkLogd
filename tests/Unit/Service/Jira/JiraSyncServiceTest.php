@@ -319,24 +319,6 @@ class JiraSyncServiceTest extends TestCaseWithDatabase
         $this->assertSame(['unchanged'], $actions);
     }
 
-    public function test_plan_matches_a_reworded_legacy_row_that_has_no_stored_ids(): void
-    {
-        // Arrange: a row synced before membership was stored - simulated by clearing the column
-        $timeEntry = $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
-        $this->syncAndFake('10001');
-        JiraWorklog::query()->update(['time_entry_ids' => null]);
-        $timeEntry->description = 'PROJ-1 fix the login redirect';
-        $timeEntry->save();
-
-        // Act
-        $plan = $this->plan();
-
-        // Assert: the ticket-and-day heuristic still carries id-less rows
-        $this->assertCount(1, $plan->items);
-        $this->assertSame(JiraSyncAction::Update, $plan->items[0]->action);
-        $this->assertSame('10001', $plan->items[0]->jiraWorklogId);
-    }
-
     public function test_execute_stamps_membership_onto_an_unchanged_legacy_row(): void
     {
         // Arrange: an up-to-date legacy row never reaches applyItem, so the stamping pass is the
