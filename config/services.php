@@ -21,6 +21,16 @@ return [
          * this in a production deployment changes nothing. Leave it unset anywhere real.
          */
         'fake' => (bool) env('JIRA_FAKE_CLIENT', false),
+
+        /*
+         * Atlassian OAuth 2.0 (3LO). One app per instance, which every customer authorises
+         * against - the same shape as the Google client below. Without it the Jira integration
+         * stays hidden, exactly as Google Calendar does without its client.
+         */
+        'client_id' => env('JIRA_CLIENT_ID'),
+        'client_secret' => env('JIRA_CLIENT_SECRET'),
+        // Resolved against APP_URL by the controller, as Socialite does for Google.
+        'redirect' => '/integrations/jira/callback',
     ],
 
     'google' => [

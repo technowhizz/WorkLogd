@@ -101,7 +101,8 @@ accounts and no way to make one through the browser. `admin:user:create` is the 
 the user together with their personal organization and prints a generated password, or pass
 `--ask-for-password` to choose one. Use the address you put in `SUPER_ADMINS` and keep
 `--verify-email` - admin panel access needs the email both listed there and verified, and
-`admin:user:verify <email>` does the latter afterwards if you forget.
+`admin:user:verify <email>` does the latter afterwards if you forget. See
+[Admin portal](#admin-portal) for what that gets you and how to hand the access to anyone else.
 
 Everyone after that joins by invitation, so registration can stay off. Someone invited to an
 organization still has to create an account before they can accept, so an invitation link opens the
@@ -124,6 +125,102 @@ the default `file` driver.
 solidtime's [self-hosting guides](https://docs.solidtime.io/self-hosting/intro) still apply to
 everything this fork has not changed.
 
+### Admin portal
+
+`/admin` is the portal for whoever runs the instance, built from the same Vue components and the
+same stylesheet as the rest of the app. It reaches across every organization: edit, export, import
+and delete organizations and see their members and pending invitations; edit users, impersonate
+them, and hand out or take away admin access; record what each organization is billed; and read
+the audit log, the failed jobs, the API tokens and the outstanding invitations.
+
+Access is not a role inside an organization. A user gets it either from the `SUPER_ADMINS`
+environment variable or from the **Super admin** switch on their record in the portal, and in both
+cases their email address has to be verified. The environment variable is the bootstrap and the way
+back in: admins named there cannot have the access taken away from inside the portal, and nobody can
+revoke their own. From the command line:
+
+```bash
+php artisan admin:user:super-admin you@example.com            # grant
+php artisan admin:user:super-admin them@example.com --revoke  # revoke
+```
+
+#### Billing
+
+Each organization has one subscription record under **Billing → Subscriptions**: a plan, a status, a
+trial end, seats, a price and interval, and a reference for whatever system actually takes the
+money. The dashboard totals monthly revenue, trials about to end, lapsed plans and organizations
+with nothing recorded, and the subscriptions table flags any organization with more members than the
+seats it paid for.
+
+#### Connecting Stripe
+
+Payments run through Stripe, via `laravel/cashier`. The organization is the customer, not the
+user - a person in three organizations is a customer of none of them personally.
+
+1. In Stripe, create one **Professional** product with two recurring **per-seat** prices, monthly
+   and yearly, in the currency you set as `BILLING_CURRENCY`.
+2. Put the keys and both price IDs in the environment:
+
+```bash
+STRIPE_KEY=pk_live_...
+STRIPE_SECRET=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+CASHIER_CURRENCY=gbp
+STRIPE_PRICE_PROFESSIONAL_MONTHLY=price_...
+STRIPE_PRICE_PROFESSIONAL_YEARLY=price_...
+```
+
+3. Add a webhook endpoint in Stripe pointing at `https://<your-host>/stripe/webhook`, subscribed
+   to the `customer.subscription.*` and `invoice.*` events. **The webhook is the source of truth** -
+   the redirect back from Checkout is not trusted for anything, because a customer can close the
+   tab before it happens.
+
+Without the price IDs the billing page says there is nothing to buy rather than breaking, so a
+self-hosted instance that never wants payments can simply leave them empty.
+
+Seats follow membership: adding a member raises the Stripe quantity and Stripe prorates the current
+period; removing one lowers it at the next renewal. That happens on a queued job, so inviting
+somebody never fails because Stripe was briefly unreachable - **the queue worker is required for
+billing to stay correct**, not just for Jira.
+
+Enterprise has no self-serve price on purpose. Those deals are negotiated and then recorded by hand
+in the admin portal, which carries a custom price, seat count, interval and an invoice reference.
+
+**Recording a subscription does not restrict anybody.** With `BILLING_ENFORCE=false`, the default,
+every organization keeps full access however its record reads, which lets you get the records right
+before they matter. Setting `BILLING_ENFORCE=true` then makes them real: an organization with more
+than one member and no active paid plan or running trial is blocked from the API until its billing
+is sorted out. `BILLING_TRIAL_DAYS` sets how long a trial started from the portal runs for, and
+`BILLING_CURRENCY` sets the currency new subscriptions default to and the one the revenue total is
+reported in.
+
+#### What each plan gets
+
+| | Free | Professional |
+|---|---|---|
+| Members | 1 | unlimited, billed per seat |
+| Jira worklogs synced | 5 per week | unlimited |
+| Google Calendar | no | yes |
+| Estimates, rounding, shared and PDF reports | no | yes |
+
+The Jira allowance counts worklogs *created* in Jira and resets on Monday. Correcting or removing a
+worklog already pushed does not spend it - otherwise fixing a typo would be a reason to run out.
+Running out never touches stored credentials: a lapsed organization keeps its Google refresh token
+and its record of what is already in Jira, because revoking the first cannot be undone and deleting
+the second would re-push every worklog as a duplicate on the way back up.
+
+The count comes from `jira_worklog_creations`, an append-only ledger, rather than from the live
+worklog rows. Those get deleted when a worklog is removed from Jira, which would make the allowance
+refundable - sync five, delete them, sync five more, forever. A creation is a fact about the past.
+Syncs are also locked one-at-a-time per organization, since two running side by side would each
+read the full allowance before either had spent any of it.
+
+One limit worth knowing: the allowance is per organization, and organizations are free to create.
+Somebody determined to dodge it could spread a week's work across several free organizations, at
+the cost of separate clients, projects, reporting and Jira configuration in each. That is a
+deliberate trade rather than an oversight - the organization is the billing unit, so it is also the
+unit the allowance belongs to.
+
 ### Google Calendar integration (optional)
 
 The Google Calendar integration is disabled until you provide an OAuth client. Without one, nothing
@@ -145,18 +242,40 @@ and apps under 100 users.
 
 ### Jira integration (optional)
 
-The Jira integration needs no environment variables and no Atlassian app registration.
+Jira uses **OAuth 2.0 (3LO)**, so it needs an Atlassian app the same way Google Calendar needs a
+Google client. Without one the integration stays hidden.
 
-1. An owner or administrator sets the **Jira site URL** (`https://your-org.atlassian.net`) under
-   *Organization Settings*. Leaving it empty hides the integration from everyone in that
-   organization.
-2. Each member creates an API token at
-   [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens) and connects
-   their own account under *Profile Settings*.
+1. At [developer.atlassian.com](https://developer.atlassian.com/console/myapps/) create an
+   **OAuth 2.0 integration** with **resource-level** access. Resource level restricts the grant to
+   the one site the person picks, rather than every site in their Atlassian account.
+2. Under *Permissions* add the **Jira platform REST API** with `read:jira-work` and
+   `write:jira-work`, and the **User identity API** with `read:me`. `offline_access` is not a
+   console permission - it is added to the authorization request, which the app does for you, and
+   without it Atlassian issues no refresh token at all.
+3. Under *Authorization* set the callback to `https://<your-host>/integrations/jira/callback`.
+4. Under *Distribution* turn sharing on, or only your own Atlassian organization can authorise it.
+5. Put the credentials in the environment:
 
-Credentials are personal on purpose, so worklogs are attributed to the person who did the work
-rather than to a shared account. Tokens are encrypted at rest with `APP_KEY` and are never returned
-by the API.
+```bash
+JIRA_CLIENT_ID=...
+JIRA_CLIENT_SECRET=...
+```
+
+Then an owner or administrator sets the **Jira site URL** (`https://your-org.atlassian.net`) under
+*Organization Settings*, and each member connects their own Atlassian account under *Profile
+Settings*. If somebody picks the wrong site on Atlassian's consent screen the connection is
+refused with the site it expected, rather than quietly logging their time to another Jira.
+
+Access is personal on purpose, so worklogs are attributed to the person who did the work rather
+than to a shared account. Access tokens last about an hour and refresh tokens rotate on every use,
+so a stolen credential is worth far less than a token that stays valid until somebody notices. A
+refresh token unused for 90 days expires, and the settings card then asks for a reconnection.
+
+**No Atlassian personal data is stored.** The connection row holds tokens and a cloud id, nothing
+else - the connected account's name and email are fetched from `/me` when the settings card renders
+and cached for well under a day. That is what places the app outside Atlassian's Personal Data
+Reporting API, and it is why the app can answer "no" to their personal data declaration. Keep it
+that way: adding an `account_id` or `email` column back would make that declaration false.
 
 Optional settings:
 

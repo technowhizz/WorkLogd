@@ -7,7 +7,12 @@ import LoadingSpinner from '@/packages/ui/src/LoadingSpinner.vue';
 
 type SyncState = {
     plan: Ref<JiraSyncPlan | null>;
-    run: Ref<null>;
+    allowance: Ref<{
+        worklogs_per_week: number | null;
+        worklogs_remaining: number | null;
+        resets_at: string;
+    } | null>;
+    run: Ref<Record<string, unknown> | null>;
     isLoadingPlan: Ref<boolean>;
     isSyncing: Ref<boolean>;
     error: Ref<string | null>;
@@ -34,6 +39,7 @@ vi.mock('@/utils/useJiraQuery', async () => {
         useJiraSync: () => {
             const state = {
                 plan: ref(null),
+                allowance: ref(null),
                 run: ref(null),
                 isLoadingPlan: ref(false),
                 isSyncing: ref(false),
@@ -44,6 +50,7 @@ vi.mock('@/utils/useJiraQuery', async () => {
             // makes reopening depend on the dialog asking for a new one
             sync.reset.mockImplementation(() => {
                 state.plan.value = null;
+                state.allowance.value = null;
                 state.isLoadingPlan.value = false;
             });
 
@@ -228,5 +235,102 @@ describe('JiraSyncDialog', () => {
         expect(wrapper.find('[data-testid="jira_sync_confirm"]').attributes('disabled')).toBe(
             'true'
         );
+    });
+});
+
+/*
+ * The free tier's weekly allowance.
+ *
+ * Worth testing at this level because the consequence of getting it wrong is silent: somebody
+ * presses Sync believing their week is going to Jira and only part of it arrives.
+ */
+describe('JiraSyncDialog weekly allowance', () => {
+    beforeEach(() => {
+        config.global.renderStubDefaultSlot = true;
+        sync.loadPlan.mockClear();
+        sync.reset.mockClear();
+    });
+
+    afterEach(() => {
+        config.global.renderStubDefaultSlot = false;
+    });
+
+    async function openWith(
+        plan: JiraSyncPlan,
+        allowance: SyncState['allowance']['value']
+    ) {
+        const wrapper = mountDialog({ show: false, startDate: '2026-08-10', endDate: '2026-08-16' });
+        await wrapper.setProps({ show: true });
+        syncState().plan.value = plan;
+        syncState().allowance.value = allowance;
+        await nextTick();
+
+        return wrapper;
+    }
+
+    it('says nothing about an allowance on a paid plan', async () => {
+        const wrapper = await openWith(planWithOneCreate(), null);
+
+        expect(wrapper.find('[data-testid="jira_sync_allowance"]').exists()).toBe(false);
+    });
+
+    it('shows what is left when the plan fits inside it', async () => {
+        const wrapper = await openWith(planWithOneCreate(), {
+            worklogs_per_week: 5,
+            worklogs_remaining: 4,
+            resets_at: '2026-08-17T00:00:00Z',
+        });
+
+        const text = wrapper.find('[data-testid="jira_sync_allowance"]').text();
+        expect(text).toContain('4 of your weekly 5');
+        expect(text).not.toContain('will not be sent');
+    });
+
+    it('warns before syncing when the plan would not fit', async () => {
+        const wrapper = await openWith(
+            planWithItems([createItem(), { ...createItem(), group_hash: 'hash-2' }]),
+            { worklogs_per_week: 5, worklogs_remaining: 1, resets_at: '2026-08-17T00:00:00Z' }
+        );
+
+        const text = wrapper.find('[data-testid="jira_sync_allowance"]').text();
+        expect(text).toContain('1 new worklog will not be sent');
+    });
+
+    it('counts only creates against the allowance, not updates or deletes', async () => {
+        const wrapper = await openWith(
+            planWithItems([
+                createItem(),
+                { ...createItem(), action: 'update', group_hash: 'hash-2' },
+                { ...createItem(), action: 'delete', group_hash: 'hash-3' },
+            ]),
+            { worklogs_per_week: 5, worklogs_remaining: 1, resets_at: '2026-08-17T00:00:00Z' }
+        );
+
+        // One create against one remaining slot fits, so nothing is withheld even though there
+        // are three changes - correcting and removing a worklog costs nothing.
+        expect(wrapper.find('[data-testid="jira_sync_allowance"]').text()).not.toContain(
+            'will not be sent'
+        );
+    });
+
+    it('does not claim everything is up to date when items were withheld', async () => {
+        const wrapper = await openWith(planWithOneCreate(), null);
+
+        syncState().run.value = {
+            status: 'completed',
+            done: 1,
+            total: 1,
+            results: [
+                {
+                    ...createItem(),
+                    status: 'skipped',
+                    error: "This week's free allowance of new Jira worklogs is used up.",
+                },
+            ],
+        };
+        await nextTick();
+
+        expect(wrapper.find('[data-testid="jira_sync_success"]').exists()).toBe(false);
+        expect(wrapper.text()).toContain('not sent');
     });
 });

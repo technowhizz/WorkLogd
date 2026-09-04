@@ -346,6 +346,7 @@ async function handleDeleteTimeEntry() {
         :enable-estimated-time="enableEstimatedTime"
         :update-time-entry="handleUpdateTimeEntry"
         :delete-time-entry="handleDeleteTimeEntry"
+        :create-time-entry="createTimeEntry"
         :create-client="createClient"
         :create-project="createProject"
         :create-tag="createTag"

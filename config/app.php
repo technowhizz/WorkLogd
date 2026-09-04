@@ -10,7 +10,6 @@ use App\Enums\TimeFormat;
 use App\Providers\AppServiceProvider;
 use App\Providers\AuthServiceProvider;
 use App\Providers\EventServiceProvider;
-use App\Providers\Filament\AdminPanelProvider;
 use App\Providers\FortifyServiceProvider;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Support\Facades\Facade;
@@ -222,7 +221,6 @@ return [
         AppServiceProvider::class,
         AuthServiceProvider::class,
         EventServiceProvider::class,
-        AdminPanelProvider::class,
         RouteServiceProvider::class,
         FortifyServiceProvider::class,
         // Warning: Do not add TelescopeServiceProvider here since it is already conditionally registered in AppServiceProvider

@@ -117,16 +117,6 @@ export function useJiraMutations() {
         queryClient.invalidateQueries({ queryKey: ['jira'] });
     }
 
-    const { mutateAsync: connect, isPending: isConnecting } = useMutation({
-        mutationFn: async (body: { email: string; api_token: string }) =>
-            await handleApiRequestNotifications(
-                () =>
-                    api.updateJiraConnection(body, { params: { organization: organizationId() } }),
-                'Jira account connected successfully',
-                'Failed to connect Jira account'
-            ),
-        onSuccess: invalidate,
-    });
 
     const { mutateAsync: updateSettings } = useMutation({
         mutationFn: async (body: { sync_from_date: string | null }) =>
@@ -151,7 +141,7 @@ export function useJiraMutations() {
         onSuccess: invalidate,
     });
 
-    return { connect, isConnecting, updateSettings, disconnect };
+    return { updateSettings, disconnect };
 }
 
 /**
@@ -160,11 +150,25 @@ export function useJiraMutations() {
  * Polling rather than a socket because a run is short lived and only interesting while the
  * dialog is open - there is nothing to keep in sync once it finishes.
  */
+export type JiraSyncAllowance = {
+    /** Worklogs a week the plan allows, or null when it is unlimited. */
+    worklogs_per_week: number | null;
+    /** Left this week, or null when unlimited. */
+    worklogs_remaining: number | null;
+    resets_at: string;
+};
+
 export function useJiraSync() {
     const queryClient = useQueryClient();
     const { addNotification } = useNotificationsStore();
 
     const plan = ref<JiraSyncPlan | null>(null);
+    /*
+     * How much of the free tier's weekly allowance is left. Null on a paid plan, which has none.
+     * Read from the preview so somebody is told before they sync rather than finding out from a
+     * row of skipped items afterwards.
+     */
+    const allowance = ref<JiraSyncAllowance | null>(null);
     const run = ref<JiraSyncRun | null>(null);
     const isLoadingPlan = ref(false);
     const isSyncing = ref(false);
@@ -181,6 +185,7 @@ export function useJiraSync() {
     function reset() {
         latestPlanRequest++;
         plan.value = null;
+        allowance.value = null;
         run.value = null;
         error.value = null;
         isLoadingPlan.value = false;
@@ -200,6 +205,10 @@ export function useJiraSync() {
                 return;
             }
             plan.value = response.data;
+            // The generated client passes unknown keys through, so this arrives without the
+            // endpoint having to be re-described there.
+            allowance.value =
+                (response as { allowance?: JiraSyncAllowance }).allowance ?? null;
         } catch (e: unknown) {
             if (request !== latestPlanRequest) {
                 return;
@@ -262,7 +271,7 @@ export function useJiraSync() {
         addNotification('error', error.value);
     }
 
-    return { plan, run, isLoadingPlan, isSyncing, error, loadPlan, start, reset };
+    return { plan, allowance, run, isLoadingPlan, isSyncing, error, loadPlan, start, reset };
 }
 
 function messageFor(e: unknown, fallback: string): string {

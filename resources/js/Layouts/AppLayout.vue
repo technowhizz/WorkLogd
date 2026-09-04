@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, usePage } from '@inertiajs/vue3';
 import Banner from '@/Components/Banner.vue';
+import ImpersonationBanner from '@/Components/ImpersonationBanner.vue';
 import OrganizationSwitcher from '@/Components/OrganizationSwitcher.vue';
 import CurrentSidebarTimer from '@/Components/CurrentSidebarTimer.vue';
 import {
@@ -18,6 +19,7 @@ import {
     XMarkIcon,
     DocumentTextIcon,
     TableCellsIcon,
+    ShieldCheckIcon,
 } from '@heroicons/vue/20/solid';
 import { PanelLeft } from '@lucide/vue';
 import NavigationSidebarItem from '@/Components/NavigationSidebarItem.vue';
@@ -165,6 +167,7 @@ onMounted(async () => {
 });
 const page = usePage<{
     has_services_extension?: boolean;
+    is_super_admin?: boolean;
     auth: {
         user: User;
     };
@@ -310,7 +313,7 @@ const page = usePage<{
                         </ul>
                     </nav>
                     <div
-                        v-if="canUpdateOrganization()"
+                        v-if="canUpdateOrganization() || page.props.is_super_admin"
                         class="text-text-tertiary text-xs font-semibold pt-5 pb-1.5">
                         Admin
                     </div>
@@ -318,16 +321,22 @@ const page = usePage<{
                     <nav>
                         <ul>
                             <NavigationSidebarItem
-                                v-if="canManageBilling() && isBillingActivated()"
+                                v-if="canManageBilling()"
                                 title="Billing"
                                 :icon="CreditCardIcon"
-                                href="/billing"></NavigationSidebarItem>
+                                :current="route().current('billing.show')"
+                                :href="route('billing.show')"></NavigationSidebarItem>
                             <NavigationSidebarItem
                                 v-if="canUpdateOrganization()"
                                 title="Import / Export"
                                 :icon="ArrowsRightLeftIcon"
                                 :current="route().current('import')"
                                 :href="route('import')"></NavigationSidebarItem>
+                            <NavigationSidebarItem
+                                v-if="page.props.is_super_admin"
+                                title="Admin portal"
+                                :icon="ShieldCheckIcon"
+                                :href="route('admin.overview')"></NavigationSidebarItem>
                             <NavigationSidebarItem
                                 v-if="canUpdateOrganization()"
                                 title="Settings"
@@ -398,6 +407,7 @@ const page = usePage<{
                 <Head :title="title" />
 
                 <!-- Page Heading -->
+                <ImpersonationBanner />
                 <Banner />
                 <BillingBanner v-if="isBillingActivated()" />
 

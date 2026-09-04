@@ -6,13 +6,13 @@ namespace App\Service;
 
 use App\Enums\Role;
 use App\Events\BeforeOrganizationDeletion;
+use App\Events\BeforeUserDeletion;
 use App\Exceptions\Api\CanNotDeleteUserWhoIsOwnerOfOrganizationWithMultipleMembers;
 use App\Models\Client;
-use App\Models\JiraConnection;
-use App\Models\JiraWorklog;
 use App\Models\Member;
 use App\Models\Organization;
 use App\Models\OrganizationInvitation;
+use App\Models\OrganizationSubscription;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\Report;
@@ -77,11 +77,9 @@ class DeletionService
         // Delete all reports
         Report::query()->whereBelongsTo($organization, 'organization')->delete();
 
-        // Delete the members' Jira credentials and the record of what was synced to Jira.
-        // Note: the worklogs themselves stay in Jira - they are that organization's record of
-        // work done, and deleting an organization here should not rewrite history over there.
-        JiraConnection::query()->whereBelongsTo($organization, 'organization')->delete();
-        JiraWorklog::query()->whereBelongsTo($organization, 'organization')->delete();
+        // Delete the billing arrangement. Whatever took the money for it lives outside this app,
+        // so cancelling there is a separate, manual step.
+        OrganizationSubscription::query()->whereBelongsTo($organization, 'organization')->delete();
 
         // Reset the current organization
         $organization->owner()
@@ -179,11 +177,11 @@ class DeletionService
 
         $user->accessTokens()->delete();
         $user->authCodes()->delete();
-        $user->googleCalendarConnection()->delete();
-        // Organizations the user owned are gone by now, so this covers the ones they were only
-        // a member of
-        $user->jiraConnections()->delete();
-        $user->jiraWorklogs()->delete();
+
+        // Anything a user owns outside core - integration credentials and the like - is removed
+        // by whoever owns it. Organizations the user owned are gone by the time this fires, so a
+        // listener only has to cover the ones they were merely a member of.
+        BeforeUserDeletion::dispatch($user);
 
         // Note: Since the deletion of the profile photo is not reversible via a database rollback this needs to be done last
         $this->userService->deleteProfilePhoto($user);

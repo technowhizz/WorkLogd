@@ -6,6 +6,7 @@ namespace App\Http\Resources\V1\Jira;
 
 use App\Http\Resources\V1\BaseResource;
 use App\Models\JiraConnection;
+use App\Service\Jira\JiraOAuthService;
 use Illuminate\Http\Request;
 
 /**
@@ -29,6 +30,10 @@ class JiraConnectionResource extends BaseResource
      */
     public function toArray(Request $request): array
     {
+        $identity = $this->resource === null
+            ? null
+            : app(JiraOAuthService::class)->identity($this->resource);
+
         return [
             /** @var bool $is_configured Whether an administrator has set a Jira site URL for the organization */
             'is_configured' => $this->siteUrl !== null,
@@ -36,10 +41,17 @@ class JiraConnectionResource extends BaseResource
             'site_url' => $this->siteUrl,
             /** @var bool $is_connected Whether the current user has connected their Jira account */
             'is_connected' => $this->resource !== null,
+            /*
+             * Fetched from Atlassian when this renders rather than stored. The application keeps
+             * no Atlassian identity of its own, which is what places it outside the Personal Data
+             * Reporting API's scope - see JiraOAuthService::identity(). Null when Atlassian
+             * cannot be reached, which is cosmetic: it must not stop the page reporting whether
+             * the connection works.
+             */
             /** @var string|null $email Email address of the connected Atlassian account */
-            'email' => $this->resource?->email,
+            'email' => $identity['email'] ?? null,
             /** @var string|null $display_name Display name of the connected Atlassian account */
-            'display_name' => $this->resource?->display_name,
+            'display_name' => $identity['name'] ?? null,
             /** @var string|null $sync_from_date Local date (Y-m-d) before which work is treated as already logged in Jira. Null means no cutoff. */
             'sync_from_date' => $this->resource?->sync_from_date?->format('Y-m-d'),
             /** @var bool $requires_reauthentication Whether Jira rejected the stored token and the account needs to be connected again */

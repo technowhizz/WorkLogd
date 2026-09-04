@@ -11,8 +11,6 @@ use App\Models\Member;
 use App\Models\Organization;
 use App\Models\TimeEntry;
 use App\Models\User;
-use Illuminate\Http\Client\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Passport\Passport;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -21,8 +19,6 @@ use PHPUnit\Framework\Attributes\UsesClass;
 class JiraEndpointTest extends ApiEndpointTestAbstract
 {
     private const string SITE_URL = 'https://acme.atlassian.net';
-
-    private const string MYSELF_URL = 'https://acme.atlassian.net/rest/api/3/myself';
 
     /**
      * @return object{user: User, organization: Organization, member: Member, owner: User, ownerMember: Member}
@@ -92,101 +88,6 @@ class JiraEndpointTest extends ApiEndpointTestAbstract
         $response->assertJsonPath('data.is_configured', true);
         $response->assertJsonPath('data.site_url', self::SITE_URL);
         $response->assertJsonPath('data.is_connected', false);
-    }
-
-    public function test_update_endpoint_verifies_the_credentials_before_storing_them(): void
-    {
-        // Arrange
-        $data = $this->configuredOrganization();
-        Passport::actingAs($data->user);
-        Http::fake([self::MYSELF_URL => Http::response([
-            'accountId' => 'account-1',
-            'displayName' => 'Sam Doe',
-            'emailAddress' => 'sam@acme.test',
-        ])]);
-
-        // Act
-        $response = $this->putJson(route('api.v1.jira.update', ['organization' => $data->organization->getKey()]), [
-            'email' => 'sam@acme.test',
-            'api_token' => 'a-real-token',
-        ]);
-
-        // Assert
-        // 201 because the connection did not exist yet - reconnecting returns 200
-        $this->assertResponseCode($response, 201);
-        $response->assertJsonPath('data.is_connected', true);
-        $response->assertJsonPath('data.display_name', 'Sam Doe');
-        // The token is never handed back to the client
-        $response->assertJsonMissingPath('data.api_token');
-        $this->assertDatabaseHas('jira_connections', [
-            'user_id' => $data->user->getKey(),
-            'organization_id' => $data->organization->getKey(),
-            'email' => 'sam@acme.test',
-        ]);
-        Http::assertSent(static fn (Request $request): bool => $request->hasHeader('Authorization'));
-    }
-
-    public function test_update_endpoint_replaces_the_token_when_reconnecting(): void
-    {
-        // Arrange
-        $data = $this->configuredOrganization();
-        JiraConnection::factory()->forUser($data->user)->forOrganization($data->organization)->requiresReauthentication()->create();
-        Passport::actingAs($data->user);
-        Http::fake([self::MYSELF_URL => Http::response([
-            'accountId' => 'account-1',
-            'displayName' => 'Sam Doe',
-            'emailAddress' => 'sam@acme.test',
-        ])]);
-
-        // Act
-        $response = $this->putJson(route('api.v1.jira.update', ['organization' => $data->organization->getKey()]), [
-            'email' => 'sam@acme.test',
-            'api_token' => 'a-fresh-token',
-        ]);
-
-        // Assert
-        $this->assertResponseCode($response, 200);
-        // One connection per user and organization, and reconnecting clears the warning
-        $this->assertDatabaseCount('jira_connections', 1);
-        $connection = JiraConnection::query()->firstOrFail();
-        $this->assertFalse($connection->requires_reauthentication);
-        $this->assertSame('a-fresh-token', $connection->api_token);
-    }
-
-    public function test_update_endpoint_stores_nothing_when_jira_rejects_the_token(): void
-    {
-        // Arrange
-        $data = $this->configuredOrganization();
-        Passport::actingAs($data->user);
-        Http::fake([self::MYSELF_URL => Http::response([], 401)]);
-
-        // Act
-        $response = $this->putJson(route('api.v1.jira.update', ['organization' => $data->organization->getKey()]), [
-            'email' => 'sam@acme.test',
-            'api_token' => 'wrong-token',
-        ]);
-
-        // Assert
-        $this->assertResponseCode($response, 400);
-        $response->assertJsonPath('key', 'jira_authentication_failed');
-        $this->assertDatabaseCount('jira_connections', 0);
-    }
-
-    public function test_update_endpoint_fails_when_the_organization_has_no_site(): void
-    {
-        // Arrange
-        $data = $this->configuredOrganization(withSite: false);
-        Passport::actingAs($data->user);
-
-        // Act
-        $response = $this->putJson(route('api.v1.jira.update', ['organization' => $data->organization->getKey()]), [
-            'email' => 'sam@acme.test',
-            'api_token' => 'a-real-token',
-        ]);
-
-        // Assert
-        $this->assertResponseCode($response, 400);
-        $response->assertJsonPath('key', 'jira_not_configured');
     }
 
     public function test_update_settings_endpoint_stores_the_sync_cutoff(): void

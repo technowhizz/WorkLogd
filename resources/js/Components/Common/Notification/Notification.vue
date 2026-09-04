@@ -30,6 +30,14 @@
                         <p v-if="message" class="mt-1 text-sm text-text-secondary">
                             {{ message }}
                         </p>
+                        <button
+                            v-if="action"
+                            type="button"
+                            data-testid="notification_action"
+                            class="mt-1.5 text-sm font-medium text-accent-600 hover:text-accent-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                            @click="runAction">
+                            {{ action.label }}
+                        </button>
                     </div>
                     <div class="ml-4 flex flex-shrink-0">
                         <button
@@ -52,11 +60,19 @@ import { CheckCircleIcon, XCircleIcon } from '@heroicons/vue/24/outline';
 import { XMarkIcon } from '@heroicons/vue/20/solid';
 import type { NotificationType } from '@/utils/notification';
 
-defineProps<{
+const props = defineProps<{
     title: string;
     type: NotificationType;
     message?: string;
+    /** Offered as a button under the message, ex. undoing a deletion. */
+    action?: { label: string; run: () => void | Promise<void> };
 }>();
+
+async function runAction() {
+    // Dismissed first, so the toast cannot be pressed twice while the action is in flight.
+    show.value = false;
+    await props.action?.run();
+}
 
 const show = ref(true);
 </script>

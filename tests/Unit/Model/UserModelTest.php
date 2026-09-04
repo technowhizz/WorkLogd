@@ -13,44 +13,95 @@ use App\Models\Passport\Token;
 use App\Models\ProjectMember;
 use App\Models\TimeEntry;
 use App\Models\User;
-use App\Providers\Filament\AdminPanelProvider;
-use Filament\Panel;
 use Illuminate\Support\Facades\Config;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 #[CoversClass(User::class)]
 class UserModelTest extends ModelTestAbstract
 {
-    public function test_normal_user_can_not_access_admin_panel(): void
+    public function test_normal_user_is_not_a_super_admin(): void
     {
         // Arrange
         Config::set('auth.super_admins', ['some@email.test', 'other@email.test']);
         $user = User::factory()->create();
-        $panelProvider = new AdminPanelProvider(app());
-        $mainPanel = $panelProvider->panel(Panel::make());
 
         // Act
-        $canAccess = $user->canAccessPanel($mainPanel);
+        $canAccess = $user->isSuperAdmin() && $user->hasVerifiedEmail();
 
         // Assert
         $this->assertFalse($canAccess);
     }
 
-    public function test_user_in_super_admin_config_can_access_admin_panel(): void
+    public function test_user_in_super_admin_config_is_a_super_admin(): void
     {
         // Arrange
         Config::set('auth.super_admins', ['some@email.test', 'other@email.test']);
         $user = User::factory()->create([
             'email' => 'some@email.test',
         ]);
-        $panelProvider = new AdminPanelProvider(app());
-        $mainPanel = $panelProvider->panel(Panel::make());
 
         // Act
-        $canAccess = $user->canAccessPanel($mainPanel);
+        $canAccess = $user->isSuperAdmin() && $user->hasVerifiedEmail();
 
         // Assert
         $this->assertTrue($canAccess);
+    }
+
+    public function test_user_with_admin_flag_is_a_super_admin(): void
+    {
+        // Arrange
+        Config::set('auth.super_admins', []);
+        $user = User::factory()->create([
+            'is_admin' => true,
+        ]);
+
+        // Act
+        $canAccess = $user->isSuperAdmin() && $user->hasVerifiedEmail();
+
+        // Assert
+        $this->assertTrue($canAccess);
+    }
+
+    public function test_user_with_admin_flag_but_unverified_email_is_refused(): void
+    {
+        // Arrange
+        Config::set('auth.super_admins', []);
+        $user = User::factory()->unverified()->create([
+            'is_admin' => true,
+        ]);
+
+        // Act
+        $canAccess = $user->isSuperAdmin() && $user->hasVerifiedEmail();
+
+        // Assert
+        $this->assertFalse($canAccess);
+    }
+
+    public function test_user_in_super_admin_config_is_a_super_admin_without_the_flag(): void
+    {
+        // Arrange
+        Config::set('auth.super_admins', ['some@email.test']);
+        $user = User::factory()->create([
+            'email' => 'some@email.test',
+            'is_admin' => false,
+        ]);
+
+        // Act & Assert
+        $this->assertTrue($user->isSuperAdmin());
+        $this->assertTrue($user->isSuperAdminByConfiguration());
+    }
+
+    public function test_user_with_admin_flag_is_not_a_super_admin_by_configuration(): void
+    {
+        // Arrange
+        Config::set('auth.super_admins', []);
+        $user = User::factory()->create([
+            'is_admin' => true,
+        ]);
+
+        // Act & Assert
+        $this->assertTrue($user->isSuperAdmin());
+        $this->assertFalse($user->isSuperAdminByConfiguration());
     }
 
     public function test_scope_belongs_to_organization_returns_only_users_of_organization_including_owners(): void

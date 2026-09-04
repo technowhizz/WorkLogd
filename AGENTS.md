@@ -93,6 +93,22 @@ directory. Build features in `app/`, not as an extension.
   `->restrictOnDelete()` — deletion is explicit in `app/Service/DeletionService.php`, so a new
   user-owned table must be cleaned up there or user deletion breaks.
 - `tests/Unit/Database/MigrationTest.php` asserts `migrate:rollback` works — `down()` must really reverse.
+- **The admin portal is Inertia, not Filament.** Filament was removed; `/admin` is
+  `app/Http/Controllers/Web/Admin/*` rendering `resources/js/Pages/Admin/*` through
+  `AdminLayout.vue`, gated by the `admin` middleware alias (`EnsureUserIsAdmin`) rather than by
+  `PermissionStore` - access is instance-wide, not a role inside an organization. Listings take
+  search, sort and pagination from the query string; the shared parsing lives in
+  `app/Http/Controllers/Web/Admin/Controller.php`, and every listing adds an `id` tiebreaker
+  because `created_at` is `timestamp(0)` and offset pagination over a tied sort key repeats rows.
+- **Jira stores no Atlassian personal data, deliberately.** `jira_connections` holds OAuth tokens
+  and a cloud id and nothing else; the connected account's name and email come from `/me` when the
+  settings card renders, cached well under 24 hours. That is what keeps the app outside Atlassian's
+  Personal Data Reporting API and lets its personal data declaration say "no". Adding an
+  `account_id`, `email` or `display_name` column back would make that declaration false.
+- **Third-party credentials use their own encryption key.** `CREDENTIAL_ENCRYPTION_KEY` via
+  `App\Casts\EncryptedCredential`, not `APP_KEY`, so a leaked `.env` does not open every
+  customer's Jira. It falls back to `APP_KEY` when unset; `admin:credentials:rotate-key` moves
+  existing rows and is safe to run twice.
 - **No policies.** Authorization is `app/Service/PermissionStore.php` (hardcoded `ROLE_DEFINITIONS`);
   controllers call `$this->checkPermission($organization, 'time-entries:create:own')`. User-scoped,
   organization-independent endpoints (API tokens, integrations) do **no** permission checks.

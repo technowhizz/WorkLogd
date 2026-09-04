@@ -51,6 +51,7 @@ return [
         OrganizationHasNoSubscriptionButMultipleMembersException::KEY => 'Organization has no subscription but multiple members',
         PdfRendererIsNotConfiguredException::KEY => 'PDF renderer is not configured',
         FeatureIsNotAvailableInFreePlanApiException::KEY => 'Feature is not available in free plan',
+        'jira_worklog_weekly_limit_reached' => 'This week\'s free allowance of new Jira worklogs is used up. Existing worklogs can still be corrected or removed, and the allowance resets on Monday.',
         PersonalAccessClientIsNotConfiguredException::KEY => 'Personal access client is not configured',
         ChangingRoleOfPlaceholderIsNotAllowed::KEY => 'Changing role of placeholder is not allowed',
         OnlyPlaceholdersCanBeMergedIntoAnotherMember::KEY => 'Only placeholders can be merged into another member',

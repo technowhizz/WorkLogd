@@ -90,7 +90,6 @@ Route::prefix('v1')->name('v1.')->group(static function (): void {
         // per user, so these are organization scoped but only ever act on your own entries.
         Route::name('jira.')->prefix('/organizations/{organization}')->group(static function (): void {
             Route::get('/jira/connection', [JiraController::class, 'show'])->name('show');
-            Route::put('/jira/connection', [JiraController::class, 'update'])->name('update');
             Route::put('/jira/settings', [JiraController::class, 'updateSettings'])->name('update-settings');
             Route::delete('/jira/connection', [JiraController::class, 'destroy'])->name('destroy');
             Route::get('/jira/sync-status', [JiraController::class, 'syncStatus'])->name('sync-status');

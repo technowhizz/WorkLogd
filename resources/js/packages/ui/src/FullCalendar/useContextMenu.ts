@@ -1,4 +1,5 @@
 import { ref, type Ref, type ComputedRef } from 'vue';
+import { duplicatePayload, splitTimeEntry } from '../TimeEntry/timeEntryActions';
 import type { Dayjs } from 'dayjs';
 import type { TimeEntry } from '@/packages/api/src';
 import { getDayJsInstance, getLocalizedDayJs, getLocalizedDayJsFromMinutes } from '../utils/time';
@@ -124,18 +125,11 @@ export function useContextMenu(params: {
     }
 
     async function handleContextDuplicate() {
-        if (!contextMenuTimeEntry.value || contextMenuTimeEntry.value.end === null) return;
-        const entry = contextMenuTimeEntry.value;
-        await params.createTimeEntry({
-            start: entry.start,
-            end: entry.end,
-            billable: entry.billable,
-            type: entry.type,
-            description: entry.description,
-            project_id: entry.project_id,
-            task_id: entry.task_id,
-            tags: entry.tags,
-        });
+        if (!contextMenuTimeEntry.value) return;
+        // Shared with the edit dialog, so the two offer the same thing.
+        const payload = duplicatePayload(contextMenuTimeEntry.value);
+        if (payload === null) return;
+        await params.createTimeEntry(payload);
         params.emitRefresh();
     }
 
@@ -146,40 +140,12 @@ export function useContextMenu(params: {
     }
 
     async function handleContextSplit() {
-        if (!contextMenuTimeEntry.value || contextMenuTimeEntry.value.end === null) return;
-        const entry = contextMenuTimeEntry.value;
-        if (!entry.end) return;
-        const start = getDayJsInstance()(entry.start);
-        const end = getDayJsInstance()(entry.end);
-        const midpoint = start.add(end.diff(start) / 2, 'millisecond').startOf('minute');
-
-        try {
-            await params.updateTimeEntry({ ...entry, end: midpoint.utc().format() });
-        } catch {
-            // Update failed, don't proceed with create
-            params.emitRefresh();
-            return;
-        }
-
-        try {
-            await params.createTimeEntry({
-                start: midpoint.utc().format(),
-                end: entry.end,
-                billable: entry.billable,
-                type: entry.type,
-                description: entry.description,
-                project_id: entry.project_id,
-                task_id: entry.task_id,
-                tags: entry.tags,
-            });
-        } catch {
-            // Create failed after update succeeded — restore original entry
-            try {
-                await params.updateTimeEntry({ ...entry });
-            } catch {
-                // Restoration also failed; refresh will show server state
-            }
-        }
+        if (!contextMenuTimeEntry.value) return;
+        await splitTimeEntry(
+            contextMenuTimeEntry.value,
+            params.updateTimeEntry,
+            params.createTimeEntry
+        );
         params.emitRefresh();
     }
 

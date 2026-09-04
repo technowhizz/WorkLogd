@@ -93,22 +93,25 @@ export async function setJiraSiteUrlViaApi(ctx: TestContext, siteUrl: string | n
     expect(response.status()).toBe(200);
 }
 
-/** Links the current user's Jira account. Verified against the fake, so it really does check. */
-export async function connectJiraViaApi(
-    ctx: TestContext,
-    credentials: { email?: string; apiToken?: string } = {}
-) {
-    const response = await ctx.request.put(
-        `${PLAYWRIGHT_BASE_URL}/api/v1/organizations/${ctx.orgId}/jira/connection`,
-        {
-            data: {
-                email: credentials.email ?? JIRA_EMAIL,
-                api_token: credentials.apiToken ?? JIRA_TOKEN,
-            },
-        }
+/**
+ * Links the current user's Jira account.
+ *
+ * Goes through the real OAuth connect route. With JIRA_FAKE_CLIENT on it short circuits the trip
+ * to Atlassian and comes straight back connected, so this exercises the route the button uses
+ * rather than a test-only side door.
+ */
+export async function connectJiraViaApi(ctx: TestContext) {
+    const response = await ctx.request.get(
+        `${PLAYWRIGHT_BASE_URL}/integrations/jira/connect`
     );
-    expect([200, 201]).toContain(response.status());
-    return (await response.json()).data as {
+    expect([200, 302]).toContain(response.status());
+
+    const connection = await ctx.request.get(
+        `${PLAYWRIGHT_BASE_URL}/api/v1/organizations/${ctx.orgId}/jira/connection`
+    );
+    expect(connection.status()).toBe(200);
+
+    return (await connection.json()).data as {
         is_configured: boolean;
         is_connected: boolean;
         display_name: string | null;

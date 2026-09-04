@@ -1,6 +1,12 @@
 /.phpunit.cache
 node_modules
 dist
+# Editor swap files. A .swp beside .env holds a copy of it, secrets and all - GitHub's push
+# protection caught exactly that once, which is one time more than it should have happened.
+*.swp
+*.swo
+*~
+
 /public/build
 /public/hot
 /public/storage

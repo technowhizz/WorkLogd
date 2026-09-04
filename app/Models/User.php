@@ -10,8 +10,6 @@ use App\Models\Concerns\CustomAuditable;
 use App\Models\Concerns\HasUuids;
 use App\Models\Passport\Token;
 use Database\Factories\UserFactory;
-use Filament\Models\Contracts\FilamentUser;
-use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -42,6 +40,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property string|null $two_factor_secret
  * @property string $timezone
  * @property bool $is_placeholder
+ * @property bool $is_admin
  * @property Weekday $week_start
  * @property int $calendar_week_days
  * @property string $no_project_color
@@ -67,7 +66,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @method Builder<User> belongsToOrganization(Organization $organization)
  * @method Builder<User> active()
  */
-class User extends Authenticatable implements AuditableContract, FilamentUser, MustVerifyEmail, OAuthenticatable
+class User extends Authenticatable implements AuditableContract, MustVerifyEmail, OAuthenticatable
 {
     use CustomAuditable;
     use HasApiTokens;
@@ -126,6 +125,10 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, M
      * @var array<string, mixed>
      */
     protected $attributes = [
+        // Without a default here the attribute is absent from a freshly created model until it is
+        // read back, and preventAccessingMissingAttributes turns every isSuperAdmin() call on a
+        // just registered user into an exception.
+        'is_admin' => false,
         'week_start' => Weekday::Monday,
         'calendar_week_days' => 7,
         'no_project_color' => '#6b7280',
@@ -158,9 +161,23 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, M
         return 'https://ui-avatars.com/api/?name='.urlencode($name).'&color=7F9CF5&background=EBF4FF';
     }
 
-    public function canAccessPanel(Panel $panel): bool
+    /**
+     * Whether this user may administrate the whole instance via the admin panel.
+     */
+    public function isSuperAdmin(): bool
     {
-        return in_array($this->email, config('auth.super_admins', []), true) && $this->hasVerifiedEmail();
+        return $this->is_admin || $this->isSuperAdminByConfiguration();
+    }
+
+    /**
+     * Whether the SUPER_ADMINS env list names this user.
+     *
+     * Admins granted this way cannot have it taken away from inside the panel, which is what makes
+     * the list a way back in after a misconfigured revoke.
+     */
+    public function isSuperAdminByConfiguration(): bool
+    {
+        return in_array($this->email, config('auth.super_admins', []), true);
     }
 
     public function isMemberOfOrganization(Organization $organization): bool

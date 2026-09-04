@@ -19,7 +19,7 @@ const organization = inject<ComputedRef<Organization>>('organization');
 const appName = useAppName();
 
 const { data: connection, isLoading } = useJiraConnectionQuery();
-const { connect, isConnecting, updateSettings, disconnect } = useJiraMutations();
+const { updateSettings, disconnect } = useJiraMutations();
 
 const isConfigured = computed(() => connection.value?.is_configured === true);
 const isConnected = computed(() => connection.value?.is_connected === true);
@@ -27,8 +27,6 @@ const requiresReauthentication = computed(
     () => connection.value?.requires_reauthentication === true
 );
 
-const email = ref('');
-const apiToken = ref('');
 const syncFromDate = ref('');
 
 // The stored cutoff only arrives once the connection query resolves
@@ -36,25 +34,12 @@ watch(
     connection,
     (value) => {
         syncFromDate.value = value?.sync_from_date ?? '';
-        if (!email.value) {
-            email.value = value?.email ?? '';
-        }
     },
     { immediate: true }
 );
 
-const canSubmit = computed(
-    () => email.value.trim() !== '' && apiToken.value.trim() !== '' && !isConnecting.value
-);
-
-async function submit() {
-    if (!canSubmit.value) {
-        return;
-    }
-    await connect({ email: email.value.trim(), api_token: apiToken.value.trim() });
-    // Never keep the token in memory once it has been stored
-    apiToken.value = '';
-}
+/** Which Atlassian site to pick on the consent screen, so the right one is granted first time. */
+const siteUrl = computed(() => connection.value?.site_url ?? null);
 
 const isSavingSettings = ref(false);
 
@@ -77,7 +62,6 @@ async function disconnectJira() {
     try {
         await disconnect();
         confirmingDisconnect.value = false;
-        apiToken.value = '';
     } finally {
         isDisconnecting.value = false;
     }
@@ -127,45 +111,27 @@ async function disconnectJira() {
                     Jira rejected the stored token. Enter a new one to start syncing again.
                 </p>
 
-                <form
-                    v-if="!isConnected || requiresReauthentication"
-                    class="space-y-4"
-                    @submit.prevent="submit">
+                <div v-if="!isConnected || requiresReauthentication" class="space-y-4">
                     <p class="text-sm text-text-secondary">
-                        Create an API token at
-                        <span class="font-medium text-text-primary"
-                            >id.atlassian.com → Security → API tokens</span
-                        >. It is stored encrypted, and worklogs are logged as you rather than as a
-                        shared account.
+                        You will be sent to Atlassian to approve access. Worklogs are logged as you
+                        rather than as a shared account, and access can be withdrawn from your
+                        Atlassian account at any time.
+                        <span v-if="siteUrl">
+                            Pick
+                            <span class="font-medium text-text-primary">{{ siteUrl }}</span>
+                            when Atlassian asks which site to grant.
+                        </span>
                     </p>
-                    <div>
-                        <InputLabel for="jira_email" value="Atlassian account email" />
-                        <TextInput
-                            id="jira_email"
-                            v-model="email"
-                            type="email"
-                            autocomplete="off"
-                            class="mt-1 block w-full"
-                            data-testid="jira_email" />
-                    </div>
-                    <div>
-                        <InputLabel for="jira_api_token" value="API token" />
-                        <TextInput
-                            id="jira_api_token"
-                            v-model="apiToken"
-                            type="password"
-                            autocomplete="off"
-                            class="mt-1 block w-full"
-                            data-testid="jira_api_token" />
-                    </div>
-                    <PrimaryButton
-                        type="submit"
-                        :disabled="!canSubmit"
-                        :class="{ 'opacity-25': !canSubmit }"
-                        data-testid="jira_connect">
-                        {{ isConnected ? 'Reconnect Jira' : 'Connect Jira' }}
-                    </PrimaryButton>
-                </form>
+                    <!--
+                        A plain anchor rather than an Inertia link: this leaves the application
+                        for Atlassian, exactly as the Google Calendar connect button does.
+                    -->
+                    <a :href="route('integrations.jira.connect')" data-testid="jira_connect">
+                        <PrimaryButton type="button">
+                            {{ isConnected ? 'Reconnect Jira' : 'Connect Jira' }}
+                        </PrimaryButton>
+                    </a>
+                </div>
 
                 <div class="space-y-2 border-t border-card-border pt-5">
                     <InputLabel value="Entries without a ticket" />

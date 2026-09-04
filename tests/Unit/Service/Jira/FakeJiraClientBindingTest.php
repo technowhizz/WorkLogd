@@ -37,7 +37,7 @@ class FakeJiraClientBindingTest extends TestCaseWithDatabase
         Member::factory()->forUser($user)->forOrganization($organization)->create();
 
         return JiraConnection::factory()->forUser($user)->forOrganization($organization)->create([
-            'api_token' => 'a-good-token',
+            'access_token' => 'a-good-token',
         ]);
     }
 
@@ -159,10 +159,18 @@ class FakeJiraClientBindingTest extends TestCaseWithDatabase
         // Arrange
         config(['services.jira.fake' => true]);
         $connection = $this->connection();
-        $connection->api_token = FakeJiraClient::REJECTED_TOKEN_PREFIX.'-token';
+        $connection->access_token = FakeJiraClient::REJECTED_TOKEN_PREFIX.'-token';
 
         // Act & Assert
+        // myself() is gone with the API tokens - identity comes from the User identity API now -
+        // so the rejection is proven on a call that still exists.
         $this->expectException(JiraAuthenticationFailedApiException::class);
-        app(JiraClientContract::class)->myself($connection);
+        app(JiraClientContract::class)->createWorklog(
+            $connection,
+            'PROJ-1',
+            null,
+            CarbonImmutable::parse('2026-08-10T09:00:00', 'UTC'),
+            3600,
+        );
     }
 }

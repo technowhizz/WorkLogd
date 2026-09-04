@@ -13,6 +13,8 @@ export const useNotificationsStore = defineStore('notifications', () => {
             message?: string;
             uuid: string;
             type: NotificationType;
+            /** An optional thing to do about it, ex. undoing a deletion. */
+            action?: { label: string; run: () => void | Promise<void> };
         }[]
     >([]);
 
@@ -25,6 +27,29 @@ export const useNotificationsStore = defineStore('notifications', () => {
         setTimeout(() => {
             removeNotification(uuid);
         }, 5000);
+    }
+
+    /**
+     * A notification that offers to do something about itself.
+     *
+     * Given longer on screen than a plain one: five seconds is fine for "saved", but it is not
+     * long enough to read "deleted", decide you did not mean it, and reach the button.
+     */
+    function addActionableNotification(
+        type: NotificationType,
+        title: string,
+        action: { label: string; run: () => void | Promise<void> },
+        message?: string,
+        timeoutMs = 10000
+    ): string {
+        const uuid = Math.random().toString(36).substring(7);
+        notifications.value.push({ title, message, type, uuid, action });
+
+        setTimeout(() => {
+            removeNotification(uuid);
+        }, timeoutMs);
+
+        return uuid;
     }
 
     function removeNotification(uuid: string) {
@@ -100,6 +125,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
     return {
         addNotification,
+        addActionableNotification,
         notifications,
         handleApiRequestNotifications,
         showActionBlockedModal,

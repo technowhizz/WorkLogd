@@ -25,7 +25,7 @@ class JiraSyncServiceTest extends TestCaseWithDatabase
 {
     private const string SITE_URL = 'https://acme.atlassian.net';
 
-    private const string WORKLOG_URL = 'https://acme.atlassian.net/rest/api/3/issue/*';
+    private const string WORKLOG_URL = 'https://api.atlassian.com/ex/jira/*/rest/api/3/issue/*';
 
     private User $user;
 
@@ -564,7 +564,7 @@ class JiraSyncServiceTest extends TestCaseWithDatabase
         $this->timeEntry('PROJ-1 fix login', '2026-08-05T09:00:00', '2026-08-05T10:00:00');
         $this->timeEntry('NOPE-9 typo in the key', '2026-08-05T11:00:00', '2026-08-05T12:00:00');
         Http::fake([
-            'https://acme.atlassian.net/rest/api/3/issue/NOPE-9/worklog*' => Http::response([
+            'https://api.atlassian.com/ex/jira/*/rest/api/3/issue/NOPE-9/worklog*' => Http::response([
                 'errorMessages' => ['Issue does not exist or you do not have permission to see it.'],
             ], 404),
             self::WORKLOG_URL => Http::response(['id' => '10001'], 201),

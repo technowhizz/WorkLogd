@@ -37,24 +37,9 @@ class JiraClient implements JiraClientContract
      */
     public const string STARTED_FORMAT = 'Y-m-d\TH:i:s.vO';
 
-    public function __construct(private readonly JiraConfig $config) {}
-
-    /**
-     * The account the token belongs to. Used to check credentials when they are saved, and to
-     * show which account is linked.
-     *
-     * @return array{account_id: string|null, display_name: string|null, email: string|null}
-     */
-    public function myself(JiraConnection $connection): array
-    {
-        $response = $this->request($connection, 'get', '/myself');
-
-        return [
-            'account_id' => $this->stringOrNull($response->json('accountId')),
-            'display_name' => $this->stringOrNull($response->json('displayName')),
-            'email' => $this->stringOrNull($response->json('emailAddress')),
-        ];
-    }
+    // The site URL is no longer part of a request: OAuth calls are proxied through
+    // api.atlassian.com against the cloud id, so JiraConfig is not needed here any more.
+    public function __construct(private readonly JiraOAuthService $oauth) {}
 
     /**
      * @return string The new worklog's id in Jira
@@ -147,19 +132,24 @@ class JiraClient implements JiraClientContract
      */
     private function request(JiraConnection $connection, string $method, string $path, ?array $payload = null): Response
     {
-        $organization = $connection->organization()->first();
-        $siteUrl = $organization === null ? null : $this->config->siteUrl($organization);
-        if ($siteUrl === null) {
+        /*
+         * OAuth calls do not go to the site host. Atlassian proxies them through
+         * api.atlassian.com/ex/jira/{cloudId}, where the cloud id is the site the person picked
+         * when they authorised - resolved once at connect time and kept on the connection.
+         */
+        if ($connection->cloud_id === null) {
             throw new JiraNotConfiguredApiException;
         }
 
-        $url = $siteUrl.'/rest/api/3'.$path;
+        $url = 'https://api.atlassian.com/ex/jira/'.$connection->cloud_id.'/rest/api/3'.$path;
         // Bulk syncing an old week would otherwise mail every watcher on every issue touched
         $query = ['notifyUsers' => 'false'];
 
         try {
             $request = Http::asJson()
-                ->withBasicAuth($connection->email, $connection->api_token)
+                // Refreshed first when it is at or near its hour, which is what keeps a long
+                // sync from failing part way through on an expiry.
+                ->withToken($this->oauth->accessTokenFor($connection))
                 ->timeout(self::TIMEOUT_SECONDS)
                 ->connectTimeout(self::CONNECT_TIMEOUT_SECONDS);
 

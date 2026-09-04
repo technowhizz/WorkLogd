@@ -22,18 +22,6 @@ use Carbon\CarbonInterface;
 interface JiraClientContract
 {
     /**
-     * The account the token belongs to. Used to check credentials when they are saved, and to
-     * show which account is linked.
-     *
-     * @return array{account_id: string|null, display_name: string|null, email: string|null}
-     *
-     * @throws JiraNotConfiguredApiException
-     * @throws JiraAuthenticationFailedApiException
-     * @throws JiraRequestFailedApiException
-     */
-    public function myself(JiraConnection $connection): array;
-
-    /**
      * @return string The new worklog's id in Jira
      *
      * @throws JiraNotConfiguredApiException

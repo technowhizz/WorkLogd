@@ -10,9 +10,11 @@ use App\Exceptions\Api\JiraNotConnectedApiException;
 use App\Exceptions\Api\JiraRequestFailedApiException;
 use App\Models\JiraConnection;
 use App\Models\JiraWorklog;
+use App\Models\JiraWorklogCreation;
 use App\Models\Organization;
 use App\Models\TimeEntry;
 use App\Models\User;
+use App\Service\EntitlementService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -376,9 +378,39 @@ class JiraSyncService
         $results = [];
         $done = 0;
 
+        // The free tier may only create so many worklogs a week. Corrections and removals of
+        // worklogs already in Jira are deliberately not counted - running out should not leave
+        // somebody unable to fix a description they got wrong.
+        $remainingCreates = app(EntitlementService::class)->jiraWorklogsRemainingThisWeek($organization);
+
         foreach ($items as $item) {
+            $isCreate = $item->action === JiraSyncAction::Create;
+
+            if ($isCreate && $remainingCreates !== null && $remainingCreates < 1) {
+                $results[] = $item->toArray() + [
+                    'status' => 'skipped',
+                    'error' => __('exceptions.api.jira_worklog_weekly_limit_reached'),
+                ];
+                $done++;
+                if ($onProgress !== null) {
+                    $onProgress($done, $total, $results[array_key_last($results)]);
+                }
+
+                continue;
+            }
+
             try {
-                $this->applyItem($connection, $user, $organization, $item);
+                $createdWorklogId = $this->applyItem($connection, $user, $organization, $item);
+
+                // Recorded only once the worklog is actually in Jira, so a request that failed
+                // on the way there does not cost somebody a slot they never got the benefit of.
+                if ($isCreate && $createdWorklogId !== null) {
+                    $this->recordCreation($user, $organization, $item, $createdWorklogId);
+                    if ($remainingCreates !== null) {
+                        $remainingCreates--;
+                    }
+                }
+
                 $result = $item->toArray() + ['status' => 'done', 'error' => null];
             } catch (JiraAuthenticationFailedApiException $e) {
                 // The credentials themselves are bad, so every remaining item would fail the
@@ -436,7 +468,26 @@ class JiraSyncService
         }
     }
 
-    private function applyItem(JiraConnection $connection, User $user, Organization $organization, JiraSyncItemDto $item): void
+    /**
+     * Add a line to the append-only ledger the weekly allowance is counted from.
+     *
+     * Written for every create regardless of plan. A paid organization has no limit to enforce,
+     * but the ledger is also the answer to "what did we push, and when" when somebody asks.
+     */
+    private function recordCreation(User $user, Organization $organization, JiraSyncItemDto $item, string $jiraWorklogId): void
+    {
+        $creation = new JiraWorklogCreation;
+        $creation->organization()->associate($organization);
+        $creation->user()->associate($user);
+        $creation->issue_key = $item->issueKey;
+        $creation->jira_worklog_id = $jiraWorklogId;
+        $creation->save();
+    }
+
+    /**
+     * @return string|null The Jira worklog id, when this item created one.
+     */
+    private function applyItem(JiraConnection $connection, User $user, Organization $organization, JiraSyncItemDto $item): ?string
     {
         if ($item->action === JiraSyncAction::Delete) {
             if ($item->jiraWorklogId !== null) {
@@ -448,7 +499,7 @@ class JiraSyncService
                 ->whereKey($item->worklogRowId)
                 ->delete();
 
-            return;
+            return null;
         }
 
         // Create and Update both need a start; only a Delete is allowed to omit it
@@ -505,7 +556,7 @@ class JiraSyncService
             $row->fill($attributes);
             $row->save();
 
-            return;
+            return $item->action === JiraSyncAction::Create ? $worklogId : null;
         }
 
         // A create, or the matched row vanished underneath us: keyed on the hash so a retried
@@ -518,6 +569,8 @@ class JiraSyncService
             ],
             $attributes,
         );
+
+        return $item->action === JiraSyncAction::Create ? $worklogId : null;
     }
 
     /**

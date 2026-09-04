@@ -31,6 +31,7 @@ import SecondaryButton from './Buttons/SecondaryButton.vue';
 import CardTitle from './CardTitle.vue';
 import Checkbox from './Input/Checkbox.vue';
 import InputLabel from './Input/InputLabel.vue';
+import AutoGrowTextarea from './Input/AutoGrowTextarea.vue';
 import TextInput from './Input/TextInput.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 import Modal from './Modal.vue';
@@ -269,6 +270,7 @@ export {
     TabsContent,
     TabsList,
     TabsTrigger,
+    AutoGrowTextarea,
     TextInput,
     time,
     TimeEntryCalendar,

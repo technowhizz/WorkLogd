@@ -63,23 +63,6 @@ class FakeJiraClient implements JiraClientContract
         return config('services.jira.fake') === true && ! app()->environment('production');
     }
 
-    /**
-     * @return array{account_id: string|null, display_name: string|null, email: string|null}
-     */
-    public function myself(JiraConnection $connection): array
-    {
-        $this->requireSite($connection);
-        $this->requireCredentials($connection);
-
-        $local = strstr($connection->email, '@', true);
-
-        return [
-            'account_id' => 'fake-account-'.substr(md5($connection->email), 0, 8),
-            'display_name' => ucwords(str_replace(['.', '_', '-'], ' ', $local === false ? $connection->email : $local)),
-            'email' => $connection->email,
-        ];
-    }
-
     public function createWorklog(JiraConnection $connection, string $issueKey, ?string $comment, CarbonInterface $startedAt, int $durationSeconds): string
     {
         $this->requireSite($connection);
@@ -197,11 +180,15 @@ class FakeJiraClient implements JiraClientContract
 
     private function requireCredentials(JiraConnection $connection): void
     {
-        if ($connection->email === '' || $connection->api_token === '') {
+        $token = $connection->access_token;
+
+        if ($token === null || $token === '' || $connection->cloud_id === null) {
             throw new JiraAuthenticationFailedApiException;
         }
 
-        if (str_starts_with(strtolower($connection->api_token), self::REJECTED_TOKEN_PREFIX)) {
+        // The browser suite proves the reauthentication path by connecting a token that starts
+        // with this prefix, so the rejection has to survive the move to OAuth.
+        if (str_starts_with(mb_strtolower($token), self::REJECTED_TOKEN_PREFIX)) {
             throw new JiraAuthenticationFailedApiException;
         }
     }

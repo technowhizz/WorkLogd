@@ -33,7 +33,8 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>();
 
 const appName = useAppName();
-const { plan, run, isLoadingPlan, isSyncing, error, loadPlan, start, reset } = useJiraSync();
+const { plan, allowance, run, isLoadingPlan, isSyncing, error, loadPlan, start, reset } =
+    useJiraSync();
 
 /*
  * The range starts as whatever the view is showing but is editable here, so a week you are not
@@ -134,6 +135,23 @@ const syncedSeconds = computed(() =>
 );
 const skipped = computed(() => plan.value?.skipped ?? []);
 
+/*
+ * The free tier's weekly allowance, and how much of this plan it covers.
+ *
+ * Only creates spend it - correcting or removing a worklog already in Jira does not - so the
+ * warning counts creates rather than changes, and says how many would be left behind.
+ */
+const creates = computed(() => items.value.filter((item) => item.action === 'create'));
+const remainingAllowance = computed(() => allowance.value?.worklogs_remaining ?? null);
+const createsOverAllowance = computed(() => {
+    const remaining = remainingAllowance.value;
+    return remaining === null ? 0 : Math.max(0, creates.value.length - remaining);
+});
+const allowanceResetsOn = computed(() => {
+    const resetsAt = allowance.value?.resets_at;
+    return resetsAt ? new Date(resetsAt).toLocaleDateString(undefined, { weekday: 'long' }) : null;
+});
+
 /** Only entries that could have been synced but were not - breaks and pre-cutoff work are noise here. */
 const missingTicket = computed(() =>
     skipped.value.filter((entry) => entry.reason === 'no_issue_key')
@@ -147,6 +165,11 @@ const hasFinished = computed(
 );
 const results = computed<JiraSyncItem[]>(() => run.value?.results ?? []);
 const failures = computed(() => results.value.filter((result) => result.status === 'failed'));
+/*
+ * Items the run declined to send because the weekly allowance ran out. Distinct from a failure:
+ * nothing went wrong, and there is a specific thing the person can do about it.
+ */
+const notSent = computed(() => results.value.filter((result) => result.status === 'skipped'));
 
 const progressLabel = computed(() => {
     if (!run.value) {
@@ -252,8 +275,21 @@ function confirm() {
                                 </li>
                             </ul>
                         </div>
+                        <div v-if="notSent.length > 0" class="space-y-1">
+                            <p class="text-sm font-medium text-accent-600">
+                                {{ notSent.length }} not sent &mdash; weekly allowance used up
+                            </p>
+                            <ul class="space-y-1 text-sm text-text-secondary">
+                                <li v-for="item in notSent" :key="item.group_hash">
+                                    <span class="font-medium text-text-primary">{{
+                                        item.issue_key
+                                    }}</span>
+                                    — {{ item.error }}
+                                </li>
+                            </ul>
+                        </div>
                         <p
-                            v-else-if="hasFinished && !error"
+                            v-if="hasFinished && !error && failures.length === 0 && notSent.length === 0"
                             class="text-sm text-text-secondary"
                             data-testid="jira_sync_success">
                             Everything in this range is now up to date in Jira.
@@ -425,7 +461,23 @@ function confirm() {
                     table. sm:mr-auto keeps it left of the buttons on a wide dialog.
                 -->
                 <p
-                    v-if="!run && changes.length > 0 && rangeError === null"
+                    v-if="!run && remainingAllowance !== null && rangeError === null"
+                    class="pt-3 text-sm text-text-secondary sm:pt-0 sm:mr-auto"
+                    data-testid="jira_sync_allowance">
+                    <span v-if="createsOverAllowance > 0" class="text-accent-600">
+                        {{ remainingAllowance }} of your weekly
+                        {{ allowance?.worklogs_per_week }} left &mdash;
+                        {{ createsOverAllowance }} new
+                        {{ createsOverAllowance === 1 ? 'worklog' : 'worklogs' }} will not be sent.
+                        Resets {{ allowanceResetsOn }}.
+                    </span>
+                    <span v-else>
+                        {{ remainingAllowance }} of your weekly
+                        {{ allowance?.worklogs_per_week }} new worklogs left.
+                    </span>
+                </p>
+                <p
+                    v-else-if="!run && changes.length > 0 && rangeError === null"
                     class="pt-3 text-sm tabular-nums text-text-secondary sm:pt-0 sm:mr-auto"
                     data-testid="jira_sync_total">
                     Total

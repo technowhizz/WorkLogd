@@ -19,9 +19,11 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Laravel\Cashier\Billable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
 /**
@@ -37,12 +39,18 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property bool $breaks_enabled
  * @property string|null $jira_site_url
  * @property string|null $jira_project_keys
+ * @property string|null $stripe_id
+ * @property string|null $pm_type
+ * @property string|null $pm_last_four
+ * @property Carbon|null $trial_ends_at
  * @property User $owner
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Collection<int, User> $users
  * @property Collection<int, User> $realUsers
  * @property-read Collection<int, OrganizationInvitation> $organizationInvitations
+ * @property-read OrganizationSubscription|null $billingRecord
+ * @property-read int|null $real_users_count
  * @property Member $membership
  * @property NumberFormat $number_format
  * @property CurrencyFormat $currency_format
@@ -54,6 +62,9 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  */
 class Organization extends Model implements AuditableContract
 {
+    // The tenant is what gets billed, so Cashier's Billable model is the organization rather than
+    // the user - a person in three organizations is a customer of none of them personally.
+    use Billable;
     use CustomAuditable;
 
     /** @use HasFactory<OrganizationFactory> */
@@ -151,6 +162,20 @@ class Organization extends Model implements AuditableContract
     public function organizationInvitations(): HasMany
     {
         return $this->hasMany(OrganizationInvitation::class, 'organization_id');
+    }
+
+    /**
+     * The organization's current billing arrangement, if one has been recorded for it.
+     *
+     * Deliberately not called subscription(): Cashier's Billable trait owns that name, and a
+     * relation of the same name silently shadows it, so every Cashier call would come back here
+     * instead of reaching Stripe. This record is the entitlement; Cashier's is Stripe's state.
+     *
+     * @return HasOne<OrganizationSubscription, $this>
+     */
+    public function billingRecord(): HasOne
+    {
+        return $this->hasOne(OrganizationSubscription::class, 'organization_id');
     }
 
     /**

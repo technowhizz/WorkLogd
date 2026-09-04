@@ -4,24 +4,19 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Exceptions\Api\JiraAuthenticationFailedApiException;
 use App\Exceptions\Api\JiraNotConfiguredApiException;
 use App\Exceptions\Api\JiraNotConnectedApiException;
-use App\Exceptions\Api\JiraRequestFailedApiException;
-use App\Http\Requests\V1\Jira\JiraConnectionUpdateRequest;
 use App\Http\Requests\V1\Jira\JiraSettingsUpdateRequest;
 use App\Http\Requests\V1\Jira\JiraSyncRangeRequest;
 use App\Http\Resources\V1\Jira\JiraConnectionResource;
 use App\Jobs\SyncJiraWorklogs;
-use App\Models\JiraConnection;
 use App\Models\Organization;
-use App\Service\Jira\JiraClientContract;
+use App\Service\EntitlementService;
 use App\Service\Jira\JiraConfig;
 use App\Service\Jira\JiraSyncRunStore;
 use App\Service\Jira\JiraSyncService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
@@ -49,49 +44,6 @@ class JiraController extends Controller
             app(JiraSyncService::class)->connectionFor($this->user(), $organization),
             app(JiraConfig::class)->siteUrl($organization),
         );
-    }
-
-    /**
-     * Connect a Jira account for the currently authenticated user
-     *
-     * The credentials are checked against Jira before anything is stored, so an incorrect token
-     * is reported straight away rather than at the first sync. Responds 201 the first time an
-     * account is connected and 200 when an existing connection is replaced.
-     *
-     * @operationId updateJiraConnection
-     *
-     * @throws AuthorizationException
-     * @throws JiraNotConfiguredApiException
-     * @throws JiraAuthenticationFailedApiException
-     * @throws JiraRequestFailedApiException
-     */
-    public function update(Organization $organization, JiraConnectionUpdateRequest $request): JiraConnectionResource
-    {
-        $this->checkPermission($organization, 'time-entries:view:own');
-        $user = $this->user();
-
-        $config = app(JiraConfig::class);
-        $siteUrl = $config->siteUrl($organization);
-        if ($siteUrl === null) {
-            throw new JiraNotConfiguredApiException;
-        }
-
-        $connection = app(JiraSyncService::class)->connectionFor($user, $organization) ?? new JiraConnection;
-        $connection->user_id = $user->getKey();
-        $connection->organization_id = $organization->getKey();
-        $connection->email = $request->getEmail();
-        $connection->api_token = $request->getApiToken();
-        $connection->requires_reauthentication = false;
-
-        // Deliberately before save(), so failed credentials leave no connection behind
-        $profile = app(JiraClientContract::class)->myself($connection);
-
-        $connection->account_id = $profile['account_id'];
-        $connection->display_name = $profile['display_name'];
-        $connection->last_verified_at = Carbon::now();
-        $connection->save();
-
-        return new JiraConnectionResource($connection, $siteUrl);
     }
 
     /**
@@ -183,6 +135,8 @@ class JiraController extends Controller
         $syncService = app(JiraSyncService::class);
         $syncService->requireConnection($this->user(), $organization);
 
+        $entitlements = app(EntitlementService::class);
+
         return response()->json([
             'data' => $syncService->plan(
                 $this->user(),
@@ -190,6 +144,13 @@ class JiraController extends Controller
                 $request->getStartDate(),
                 $request->getEndDate(),
             )->toArray(),
+            // Told before the sync rather than discovered during it, so the preview can say how
+            // much of the week's allowance the plan would spend.
+            'allowance' => [
+                'worklogs_per_week' => $entitlements->jiraWorklogsPerWeek($organization),
+                'worklogs_remaining' => $entitlements->jiraWorklogsRemainingThisWeek($organization),
+                'resets_at' => $entitlements->weekResetsAt()->toIso8601ZuluString(),
+            ],
         ]);
     }
 

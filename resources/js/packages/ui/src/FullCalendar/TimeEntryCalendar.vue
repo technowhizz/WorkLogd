@@ -697,6 +697,7 @@ function getEventDurationSeconds(dayEvent: DayEvent, dayStr: string): number {
             :enable-estimated-time="enableEstimatedTime"
             :update-time-entry="updateTimeEntry"
             :delete-time-entry="deleteTimeEntry"
+            :create-time-entry="createTimeEntry"
             :create-client="createClient"
             :create-project="createProject"
             :create-tag="createTag"

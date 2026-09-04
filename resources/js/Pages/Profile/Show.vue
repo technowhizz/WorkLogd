@@ -10,7 +10,11 @@ import type { Session } from '@/types/jetstream';
 import ApiTokensForm from '@/Pages/Profile/Partials/ApiTokensForm.vue';
 import ThemeForm from '@/Pages/Profile/Partials/ThemeForm.vue';
 import GoogleCalendarForm from '@/Pages/Profile/Partials/GoogleCalendarForm.vue';
-import { isGoogleCalendarEnabled } from '@/utils/googleCalendar';
+import GoogleCalendarUpgradeNotice from '@/Pages/Profile/Partials/GoogleCalendarUpgradeNotice.vue';
+import {
+    googleCalendarRequiresUpgrade,
+    isGoogleCalendarEnabled,
+} from '@/utils/googleCalendar';
 import JiraForm from '@/Pages/Profile/Partials/JiraForm.vue';
 import { isJiraEnabled } from '@/utils/jira';
 
@@ -59,6 +63,11 @@ defineProps<{
 
                 <template v-if="isGoogleCalendarEnabled()">
                     <GoogleCalendarForm />
+
+                    <SectionBorder />
+                </template>
+                <template v-else-if="googleCalendarRequiresUpgrade()">
+                    <GoogleCalendarUpgradeNotice />
 
                     <SectionBorder />
                 </template>

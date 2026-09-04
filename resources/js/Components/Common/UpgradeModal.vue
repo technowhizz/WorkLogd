@@ -40,13 +40,13 @@ const show = defineModel('show', { default: false });
                         via
                         <a
                             class="text-accent-200/80 transition text-accent-300"
-                            href="mailto:hello@solidtime.io"
-                            >hello@solidtime.io</a
+                            href="mailto:support@worklogd.com"
+                            >support@worklogd.com</a
                         >
                         to try out this feature.
                     </p>
 
-                    <Link v-if="isBillingActivated() && canManageBilling()" href="/billing">
+                    <Link v-if="canManageBilling()" :href="route('billing.show')">
                         <PrimaryButton
                             v-if="isBillingActivated() && canUpdateOrganization()"
                             type="button"

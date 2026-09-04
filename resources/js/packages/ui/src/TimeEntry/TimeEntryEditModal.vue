@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import DialogModal from '@/packages/ui/src/DialogModal.vue';
 import { computed, inject, nextTick, ref, watch, type ComputedRef } from 'vue';
@@ -28,8 +27,20 @@ import DurationHumanInput from '@/packages/ui/src/Input/DurationHumanInput.vue';
 
 import { InformationCircleIcon } from '@heroicons/vue/20/solid';
 import { Coffee } from '@lucide/vue';
-import type { Tag, Task } from '@/packages/api/src';
+import type { CreateTimeEntryBody, Tag, Task } from '@/packages/api/src';
 import TimePickerSimple from '@/packages/ui/src/Input/TimePickerSimple.vue';
+import AutoGrowTextarea from '@/packages/ui/src/Input/AutoGrowTextarea.vue';
+import {
+    duplicatePayload,
+    splitTimeEntry,
+} from '@/packages/ui/src/TimeEntry/timeEntryActions';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/packages/ui/src';
+import { DocumentDuplicateIcon, EllipsisVerticalIcon, ScissorsIcon } from '@heroicons/vue/20/solid';
 import { useBreaksEnabled } from '@/packages/ui/src/utils/useBreaksEnabled';
 
 // Breaks may have been disabled after this entry was created, so an existing break can still be
@@ -45,6 +56,11 @@ const props = defineProps<{
     enableEstimatedTime: boolean;
     updateTimeEntry: (entry: TimeEntry) => Promise<void>;
     deleteTimeEntry: (timeEntryId: string) => Promise<void>;
+    /**
+     * Supplying this turns on the actions menu next to Delete. Duplicating and splitting both
+     * create an entry, so a host without a create path cannot offer either.
+     */
+    createTimeEntry?: (entry: Omit<CreateTimeEntryBody, 'member_id'>) => Promise<unknown> | unknown;
     createClient: (client: CreateClientBody) => Promise<Client | undefined>;
     createProject: (project: CreateProjectBody) => Promise<Project | undefined>;
     createTag: (name: string) => Promise<Tag | undefined>;
@@ -57,7 +73,7 @@ const props = defineProps<{
     canCreateProject: boolean;
 }>();
 
-const description = ref<HTMLInputElement | null>(null);
+const description = ref<{ focus: () => void; select: () => void } | null>(null);
 
 watch(show, (value) => {
     if (value) {
@@ -156,6 +172,58 @@ async function submit() {
     }
 }
 
+const busy = ref(false);
+
+/*
+ * Both actions create an entry, which the server refuses for a break when breaks are disabled -
+ * the same guard the calendar's right-click menu applies. A running entry has no end, so there is
+ * nothing to halve and nothing to copy the length of.
+ */
+const canDuplicateOrSplit = computed(() => {
+    const entry = editableTimeEntry.value;
+
+    if (!props.createTimeEntry || !entry || entry.end === null) {
+        return false;
+    }
+
+    return entry.type !== 'break' || breaksEnabled.value;
+});
+
+async function duplicateEntry() {
+    const entry = editableTimeEntry.value;
+    if (!entry || !props.createTimeEntry) {
+        return;
+    }
+
+    const payload = duplicatePayload(entry);
+    if (payload === null) {
+        return;
+    }
+
+    busy.value = true;
+    try {
+        await props.createTimeEntry(payload);
+        show.value = false;
+    } finally {
+        busy.value = false;
+    }
+}
+
+async function splitEntry() {
+    const entry = editableTimeEntry.value;
+    if (!entry || !props.createTimeEntry) {
+        return;
+    }
+
+    busy.value = true;
+    try {
+        await splitTimeEntry(entry, props.updateTimeEntry, props.createTimeEntry);
+        show.value = false;
+    } finally {
+        busy.value = false;
+    }
+}
+
 async function deleteEntry() {
     if (editableTimeEntry.value) {
         deleting.value = true;
@@ -224,14 +292,14 @@ const externalReference = computed(() =>
             <div v-if="editableTimeEntry" class="space-y-4">
                 <div class="sm:flex items-end space-y-2 sm:space-y-0 sm:space-x-4">
                     <div class="flex-1">
-                        <TextInput
+                        <AutoGrowTextarea
                             id="description"
                             ref="description"
                             v-model="editableTimeEntry.description"
-                            placeholder="What did you work on?"
-                            type="text"
+                            placeholder="What did you work on? Shift + Enter for a new line"
+                            :max-rows="6"
                             class="mt-1 block w-full"
-                            @keydown.enter="submit" />
+                            @submit="submit" />
                     </div>
                     <!-- Updates as the description is typed, so adding a key is confirmed at once -->
                     <div v-if="tracksExternalReferences" class="shrink-0 sm:pb-1.5">
@@ -374,13 +442,43 @@ const externalReference = computed(() =>
         </template>
         <template #footer>
             <div class="flex justify-between w-full">
-                <SecondaryButton
-                    tabindex="2"
-                    class="bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
-                    :disabled="deleting || saving"
-                    @click="deleteEntry">
-                    {{ deleting ? 'Deleting...' : 'Delete' }}
-                </SecondaryButton>
+                <div class="flex items-center space-x-2">
+                    <SecondaryButton
+                        tabindex="2"
+                        class="bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
+                        :disabled="deleting || saving"
+                        @click="deleteEntry">
+                        {{ deleting ? 'Deleting...' : 'Delete' }}
+                    </SecondaryButton>
+                    <DropdownMenu v-if="canDuplicateOrSplit">
+                        <DropdownMenuTrigger as-child>
+                            <button
+                                type="button"
+                                data-testid="time_entry_edit_more"
+                                aria-label="More actions for this time entry"
+                                :disabled="saving || deleting || busy"
+                                class="rounded-lg h-9 w-9 inline-flex items-center justify-center text-text-secondary hover:bg-card-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition disabled:opacity-40">
+                                <EllipsisVerticalIcon class="w-5 h-5" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent class="min-w-[170px]" align="start">
+                            <DropdownMenuItem
+                                data-testid="time_entry_edit_duplicate"
+                                class="flex items-center space-x-3 cursor-pointer"
+                                @click="duplicateEntry">
+                                <DocumentDuplicateIcon class="w-5" />
+                                <span>Duplicate</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                data-testid="time_entry_edit_split"
+                                class="flex items-center space-x-3 cursor-pointer"
+                                @click="splitEntry">
+                                <ScissorsIcon class="w-5" />
+                                <span>Split in two</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
                 <div class="flex space-x-3">
                     <SecondaryButton tabindex="2" @click="show = false"> Cancel</SecondaryButton>
                     <PrimaryButton

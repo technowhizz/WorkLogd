@@ -8,9 +8,11 @@
                 :key="notification.uuid"
                 :type="notification.type"
                 :title="notification.title"
-                :message="notification.message"></Notification>
+                :message="notification.message"
+                :action="notification.action"></Notification>
         </div>
     </div>
+    <TimeEntryUndoShortcut />
     <DialogModal :show="showActionBlockedModal">
         <template #title>
             <div class="flex space-x-2">
@@ -49,6 +51,7 @@
 
 <script setup lang="ts">
 import Notification from '@/Components/Common/Notification/Notification.vue';
+import TimeEntryUndoShortcut from '@/Components/TimeEntryUndoShortcut.vue';
 import { storeToRefs } from 'pinia';
 import { useNotificationsStore } from '@/utils/notification';
 import DialogModal from '@/packages/ui/src/DialogModal.vue';

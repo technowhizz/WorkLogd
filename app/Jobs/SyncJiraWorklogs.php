@@ -13,6 +13,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -37,6 +38,25 @@ class SyncJiraWorklogs implements ShouldQueue
      * so a failure is reported to the user instead.
      */
     public int $tries = 1;
+
+    /**
+     * One sync per organization at a time.
+     *
+     * Two runs side by side each read the weekly allowance before either has spent any of it, so
+     * a free organization could double it by pressing Sync twice. Overlapping runs are also a way
+     * to get duplicate worklogs into Jira on their own account, since both plan against the same
+     * unchanged state. Released rather than dropped, so the second run happens - just afterwards.
+     *
+     * @return array<int, object>
+     */
+    public function middleware(): array
+    {
+        return [
+            (new WithoutOverlapping('jira-sync:'.$this->organization->getKey()))
+                ->releaseAfter(10)
+                ->expireAfter(600),
+        ];
+    }
 
     public function __construct(
         public readonly User $user,

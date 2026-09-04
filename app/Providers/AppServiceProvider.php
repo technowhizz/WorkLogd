@@ -9,6 +9,7 @@ use App\Models\FailedJob;
 use App\Models\Member;
 use App\Models\Organization;
 use App\Models\OrganizationInvitation;
+use App\Models\OrganizationSubscription;
 use App\Models\Passport\Token;
 use App\Models\Project;
 use App\Models\ProjectMember;
@@ -23,12 +24,11 @@ use App\Service\Jira\FakeJiraClient;
 use App\Service\Jira\JiraClient;
 use App\Service\Jira\JiraClientContract;
 use App\Service\PermissionStore;
+use App\Service\SubscriptionBillingService;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Dedoc\Scramble\Support\Generator\SecuritySchemes\OAuthFlow;
-use Filament\Forms\Components\Section;
-use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Application;
@@ -65,6 +65,7 @@ class AppServiceProvider extends ServiceProvider
             'membership' => Member::class,
             'organization' => Organization::class,
             'organization-invitation' => OrganizationInvitation::class,
+            'organization-subscription' => OrganizationSubscription::class,
             'project' => Project::class,
             'project-member' => ProjectMember::class,
             'tag' => Tag::class,
@@ -73,14 +74,6 @@ class AppServiceProvider extends ServiceProvider
             'user' => User::class,
         ]);
         Model::unguard();
-
-        // Filament
-        Section::configureUsing(function (Section $section): void {
-            $section->columns(1);
-        }, null, true);
-        Table::configureUsing(function (Table $table): void {
-            $table->paginated([10, 25, 50, 100]);
-        });
 
         // Scramble
         Scramble::extendOpenApi(function (OpenApi $openApi): void {
@@ -99,7 +92,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Extensions
         $this->app->bind(IpLookupServiceContract::class, NoIpLookupService::class);
-        $this->app->bind(BillingContract::class);
+        $this->app->bind(BillingContract::class, SubscriptionBillingService::class);
 
         /*
          * Jira. The real client is what everything resolves to; FakeJiraClient is a test seam for

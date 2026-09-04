@@ -8,7 +8,9 @@ use App\Exceptions\Api\GoogleCalendarNotConnectedApiException;
 use App\Exceptions\Api\GoogleCalendarReauthenticationRequiredApiException;
 use App\Http\Controllers\Api\V1\GoogleCalendarController;
 use App\Models\GoogleCalendarConnection;
+use App\Models\OrganizationSubscription;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Laravel\Passport\Passport;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -16,6 +18,9 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(GoogleCalendarController::class)]
 class GoogleCalendarEndpointTest extends ApiEndpointTestAbstract
 {
+    // Entitlements read the real subscription records rather than the suite-wide billing mock.
+    protected bool $mockBillingContract = false;
+
     private const string EVENTS_URL = 'https://www.googleapis.com/calendar/v3/calendars/primary/events*';
 
     private const string REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
@@ -167,6 +172,55 @@ class GoogleCalendarEndpointTest extends ApiEndpointTestAbstract
             'id' => $otherConnection->getKey(),
         ]);
         Http::assertNothingSent();
+    }
+
+    public function test_events_endpoint_is_refused_on_a_free_plan(): void
+    {
+        // Arrange
+        Config::set('billing.enforce', true);
+        Config::set('billing.free.google_calendar', false);
+        $data = $this->createUserWithPermission([]);
+        GoogleCalendarConnection::factory()->forUser($data->user)->create();
+        Http::fake();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->getJson(route('api.v1.users.google-calendar.events', [
+            'start' => '2026-08-05T00:00:00Z',
+            'end' => '2026-08-06T00:00:00Z',
+        ]));
+
+        // Assert
+        $this->assertResponseCode($response, 400);
+        $response->assertJsonPath('key', 'feature_is_not_available_in_free_plan');
+        // Refusing to serve the events must not disturb the stored credentials - a Google refresh
+        // token cannot be un-revoked, and the plan may well come back.
+        $this->assertDatabaseCount('google_calendar_connections', 1);
+        Http::assertNothingSent();
+    }
+
+    public function test_events_endpoint_is_allowed_on_a_paid_plan(): void
+    {
+        // Arrange
+        Config::set('billing.enforce', true);
+        Config::set('billing.free.google_calendar', false);
+        $data = $this->createUserWithPermission([]);
+        OrganizationSubscription::factory()->forOrganization($data->organization)->create();
+        GoogleCalendarConnection::factory()->forUser($data->user)->create();
+        Http::fake([
+            'https://www.googleapis.com/*' => Http::response(['items' => []], 200),
+            'https://oauth2.googleapis.com/*' => Http::response(['access_token' => 'x', 'expires_in' => 3600], 200),
+        ]);
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->getJson(route('api.v1.users.google-calendar.events', [
+            'start' => '2026-08-05T00:00:00Z',
+            'end' => '2026-08-06T00:00:00Z',
+        ]));
+
+        // Assert
+        $this->assertResponseCode($response, 200);
     }
 
     public function test_events_endpoint_fails_if_user_is_not_authenticated(): void

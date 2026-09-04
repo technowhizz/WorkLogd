@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Exceptions\Api\FeatureIsNotAvailableInFreePlanApiException;
 use App\Exceptions\Api\GoogleCalendarNotConnectedApiException;
 use App\Exceptions\Api\GoogleCalendarReauthenticationRequiredApiException;
 use App\Exceptions\Api\GoogleCalendarRequestFailedApiException;
@@ -11,6 +12,7 @@ use App\Http\Requests\V1\GoogleCalendar\GoogleCalendarEventIndexRequest;
 use App\Http\Resources\V1\GoogleCalendar\GoogleCalendarConnectionResource;
 use App\Http\Resources\V1\GoogleCalendar\GoogleCalendarEventCollection;
 use App\Http\Resources\V1\GoogleCalendar\GoogleCalendarEventResource;
+use App\Service\EntitlementService;
 use App\Service\GoogleCalendar\GoogleCalendarService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
@@ -75,6 +77,20 @@ class GoogleCalendarController extends Controller
     public function events(GoogleCalendarEventIndexRequest $request): GoogleCalendarEventCollection
     {
         $user = $this->user();
+
+        /*
+         * The connection belongs to the user, but plans belong to organizations - so a person in
+         * a paid organization and a free one has no single answer. Their current organization is
+         * the one the calendar is being looked at inside, and is what decides.
+         *
+         * Note this only withholds the events. The connection itself is left alone: revoking a
+         * Google refresh token cannot be undone, and someone whose organization lapses for a
+         * month should not have to re-authorise to get their calendar back.
+         */
+        $organization = $user->currentOrganization;
+        if ($organization !== null && ! app(EntitlementService::class)->allowsGoogleCalendar($organization)) {
+            throw new FeatureIsNotAvailableInFreePlanApiException;
+        }
 
         $connection = $user->googleCalendarConnection()->first();
         if ($connection === null) {

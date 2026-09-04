@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import DialogModal from '@/packages/ui/src/DialogModal.vue';
 import { computed, nextTick, ref, watch } from 'vue';
+import AutoGrowTextarea from '@/packages/ui/src/Input/AutoGrowTextarea.vue';
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import TimeTrackerProjectTaskDropdown from '@/packages/ui/src/TimeTracker/TimeTrackerProjectTaskDropdown.vue';
 import { TagIcon } from '@heroicons/vue/20/solid';
@@ -43,7 +43,7 @@ const props = defineProps<{
     canCreateProject: boolean;
 }>();
 
-const description = ref<HTMLInputElement | null>(null);
+const description = ref<{ focus: () => void; select: () => void } | null>(null);
 
 watch(show, (value) => {
     if (value) {
@@ -145,15 +145,15 @@ const billableProxy = computed({
         <template #content>
             <div class="sm:flex items-end space-y-2 sm:space-y-0 sm:space-x-4">
                 <div class="flex-1">
-                    <TextInput
+                    <AutoGrowTextarea
                         id="description"
                         ref="description"
                         v-model="timeEntry.description"
                         aria-label="Description"
-                        placeholder="What did you work on?"
-                        type="text"
+                        placeholder="What did you work on? Shift + Enter for a new line"
+                        :max-rows="6"
                         class="mt-1 block w-full"
-                        @keydown.enter="submit" />
+                        @submit="submit" />
                 </div>
             </div>
             <div class="flex flex-col sm:flex-row sm:items-end gap-2 pt-4">

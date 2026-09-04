@@ -7,10 +7,60 @@ import {
 } from '@/packages/api/src';
 import { getCurrentMembershipId, getCurrentOrganizationId } from '@/utils/useUser';
 import { useNotificationsStore } from '@/utils/notification';
+import { restorablePayload, useTimeEntryUndo } from '@/utils/useTimeEntryUndo';
 
 export function useTimeEntriesMutations() {
     const queryClient = useQueryClient();
-    const { handleApiRequestNotifications, addNotification } = useNotificationsStore();
+    const { handleApiRequestNotifications, addNotification, addActionableNotification } =
+        useNotificationsStore();
+    const { remember, undo } = useTimeEntryUndo();
+
+    /**
+     * The entries behind a set of ids, taken from the query cache.
+     *
+     * Read before the delete so an undo has something to put back. Going through the cache rather
+     * than changing every deleteTimeEntry(id) call site keeps this to one file - and the entries
+     * are always cached, because the row being deleted was rendered from that cache.
+     */
+    function cachedEntries(ids: string[]): TimeEntry[] {
+        const wanted = new Set(ids);
+        const found = new Map<string, TimeEntry>();
+
+        for (const [, data] of queryClient.getQueriesData<{ data?: TimeEntry[] }>({
+            queryKey: ['timeEntries'],
+        })) {
+            for (const entry of data?.data ?? []) {
+                if (wanted.has(entry.id)) {
+                    found.set(entry.id, entry);
+                }
+            }
+        }
+
+        return [...found.values()];
+    }
+
+    function offerUndo(entries: TimeEntry[], title: string) {
+        if (entries.length === 0) {
+            // Nothing was cached, so there is nothing honest to offer. Better a plain confirmation
+            // than an Undo button that would quietly do nothing.
+            addNotification('success', title);
+
+            return;
+        }
+
+        remember({
+            entries: entries.map(restorablePayload),
+            label: title,
+            restore: (entry) => createTimeEntry(entry),
+        });
+
+        addActionableNotification('success', title, {
+            label: 'Undo',
+            run: async () => {
+                await undo();
+            },
+        });
+    }
 
     const { mutateAsync: createTimeEntry } = useMutation({
         mutationFn: async (timeEntry: Omit<CreateTimeEntryBody, 'member_id'>) => {
@@ -121,7 +171,10 @@ export function useTimeEntriesMutations() {
         mutationFn: async (timeEntryId: string) => {
             const organizationId = getCurrentOrganizationId();
             if (organizationId) {
-                return await handleApiRequestNotifications(
+                // Captured before the request, because afterwards it is gone from the cache too.
+                const deleted = cachedEntries([timeEntryId]);
+
+                const response = await handleApiRequestNotifications(
                     () =>
                         api.deleteTimeEntry(undefined, {
                             params: {
@@ -129,9 +182,13 @@ export function useTimeEntriesMutations() {
                                 timeEntry: timeEntryId,
                             },
                         }),
-                    'Time entry deleted successfully',
+                    undefined,
                     'Failed to delete time entry'
                 );
+
+                offerUndo(deleted, 'Time entry deleted');
+
+                return response;
             }
         },
         onSuccess: () => {
@@ -147,7 +204,7 @@ export function useTimeEntriesMutations() {
             const organizationId = getCurrentOrganizationId();
             const timeEntryIds = timeEntries.map((entry) => entry.id);
             if (organizationId) {
-                return await handleApiRequestNotifications(
+                const response = await handleApiRequestNotifications(
                     () =>
                         api.deleteTimeEntries(undefined, {
                             queries: {
@@ -157,9 +214,18 @@ export function useTimeEntriesMutations() {
                                 organization: organizationId,
                             },
                         }),
-                    'Time entries deleted successfully',
+                    undefined,
                     'Failed to delete time entries'
                 );
+
+                offerUndo(
+                    timeEntries,
+                    timeEntries.length === 1
+                        ? 'Time entry deleted'
+                        : `${timeEntries.length} time entries deleted`
+                );
+
+                return response;
             }
         },
         onSuccess: () => {

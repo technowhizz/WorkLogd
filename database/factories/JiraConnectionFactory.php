@@ -25,10 +25,12 @@ class JiraConnectionFactory extends Factory
         return [
             'user_id' => User::factory(),
             'organization_id' => Organization::factory(),
-            'email' => $this->faker->safeEmail(),
-            'account_id' => (string) $this->faker->numerify('5b10a2844c20165700ede####'),
-            'display_name' => $this->faker->name(),
-            'api_token' => 'api-token-'.$this->faker->uuid(),
+            'access_token' => 'access-token-'.$this->faker->uuid(),
+            'refresh_token' => 'refresh-token-'.$this->faker->uuid(),
+            // Comfortably in the future, so a connection is usable without a refresh round trip
+            // unless a test asks for one.
+            'token_expires_at' => Carbon::now()->addHour(),
+            'cloud_id' => (string) $this->faker->uuid(),
             'requires_reauthentication' => false,
             'sync_from_date' => null,
             'last_verified_at' => Carbon::now(),
@@ -56,6 +58,16 @@ class JiraConnectionFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'sync_from_date' => $date,
+        ]);
+    }
+
+    /**
+     * An access token past its life, so the next request has to refresh first.
+     */
+    public function expired(): self
+    {
+        return $this->state(fn (array $attributes): array => [
+            'token_expires_at' => Carbon::now()->subMinutes(5),
         ]);
     }
 

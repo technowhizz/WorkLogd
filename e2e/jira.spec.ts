@@ -7,11 +7,8 @@ import {
 } from './utils/api';
 import { scrollIntoViewCentred } from './utils/scroll';
 import {
-    JIRA_BAD_TOKEN,
-    JIRA_EMAIL,
     JIRA_FAILING_ISSUE_KEY,
     JIRA_SITE_URL,
-    JIRA_TOKEN,
     connectJiraViaApi,
     dismissJiraSyncDialogByClickingOutside,
     getJiraSyncStatusViaApi,
@@ -152,32 +149,13 @@ test('test that the jira card asks for credentials once a site is configured', a
     await page.goto(PLAYWRIGHT_BASE_URL + '/user/profile');
 
     // Assert
-    await expect(page.getByTestId('jira_email')).toBeVisible();
-    await expect(page.getByTestId('jira_api_token')).toBeVisible();
+    // Connecting is a handoff to Atlassian now rather than a token to paste.
+    await expect(page.getByTestId('jira_connect')).toBeVisible();
     // Nothing to disconnect, and no sync cutoff, until an account is actually linked
     await expect(page.getByTestId('jira_disconnect')).toHaveCount(0);
     await expect(page.getByTestId('jira_sync_from_date')).toHaveCount(0);
     // The missing-ticket toggle is not gated on a connection - it needs no Jira account
     await expect(page.getByTestId('jira_missing_ticket_toggle')).toBeVisible();
-});
-
-test('test that the connect button stays disabled until both fields are filled', async ({
-    page,
-}) => {
-    // Arrange
-    const ctx = await setupTestContext(page);
-    await setJiraSiteUrlViaApi(ctx, SITE_URL);
-    await page.goto(PLAYWRIGHT_BASE_URL + '/user/profile');
-
-    // Act & Assert
-    const connect = page.getByTestId('jira_connect');
-    await expect(connect).toBeDisabled();
-
-    await page.getByTestId('jira_email').fill(JIRA_EMAIL);
-    await expect(connect).toBeDisabled();
-
-    await page.getByTestId('jira_api_token').fill(JIRA_TOKEN);
-    await expect(connect).toBeEnabled();
 });
 
 test('test that connecting a jira account from the profile card links it', async ({ page }) => {
@@ -187,56 +165,18 @@ test('test that connecting a jira account from the profile card links it', async
     await page.goto(PLAYWRIGHT_BASE_URL + '/user/profile');
 
     // Act
-    await expect(page.getByTestId('jira_email')).toBeEditable();
-    await page.getByTestId('jira_email').fill(JIRA_EMAIL);
-    await page.getByTestId('jira_api_token').fill(JIRA_TOKEN);
+    // The button leaves for Atlassian; with the fake client on it returns straight back.
     await page.getByTestId('jira_connect').click();
 
     // Assert
     await expect(page.getByTestId('jira_connected_account')).toBeVisible();
-    await expect(page.getByTestId('jira_connected_account')).toContainText(JIRA_EMAIL);
     await expect(page.getByTestId('jira_connected_account')).toContainText(SITE_URL);
-    // The credentials form gives way to the things only a connected account has
-    await expect(page.getByTestId('jira_api_token')).toHaveCount(0);
+    // The connect prompt gives way to the things only a connected account has
     await expect(page.getByTestId('jira_disconnect')).toBeVisible();
     await expect(page.getByTestId('jira_sync_from_date')).toBeVisible();
 
     // Assert: and it survives a reload, so it really was stored
     await page.reload();
-    await expect(page.getByTestId('jira_connected_account')).toContainText(JIRA_EMAIL);
-});
-
-test('test that bad jira credentials are rejected and nothing is stored', async ({ page }) => {
-    // Arrange
-    // The credentials are checked before the connection is saved, so a wrong token has to leave
-    // the card exactly as it was rather than half connected.
-    const ctx = await setupTestContext(page);
-    await setJiraSiteUrlViaApi(ctx, SITE_URL);
-    await page.goto(PLAYWRIGHT_BASE_URL + '/user/profile');
-
-    // Act
-    await expect(page.getByTestId('jira_email')).toBeEditable();
-    await page.getByTestId('jira_email').fill(JIRA_EMAIL);
-    await page.getByTestId('jira_api_token').fill(JIRA_BAD_TOKEN);
-    await page.getByTestId('jira_connect').click();
-
-    // Assert
-    await expect(page.getByText('Failed to connect Jira account')).toBeVisible();
-    await expect(page.getByTestId('jira_connected_account')).toHaveCount(0);
-    await expect(page.getByTestId('jira_disconnect')).toHaveCount(0);
-
-    // Assert: nothing was stored, so a reload still shows the empty form
-    await page.reload();
-    await expect(page.getByTestId('jira_email')).toBeVisible();
-    await expect(page.getByTestId('jira_connected_account')).toHaveCount(0);
-
-    // Act: the good token then works, from the same card
-    await expect(page.getByTestId('jira_api_token')).toBeEditable();
-    await page.getByTestId('jira_email').fill(JIRA_EMAIL);
-    await page.getByTestId('jira_api_token').fill(JIRA_TOKEN);
-    await page.getByTestId('jira_connect').click();
-
-    // Assert
     await expect(page.getByTestId('jira_connected_account')).toBeVisible();
 });
 
@@ -260,7 +200,7 @@ test('test that disconnecting jira asks first and then unlinks the account', asy
     await page.getByTestId('jira_disconnect_confirm').click();
 
     // Assert
-    await expect(page.getByTestId('jira_email')).toBeVisible();
+    await expect(page.getByTestId('jira_connect')).toBeVisible();
     await expect(page.getByTestId('jira_connected_account')).toHaveCount(0);
     await expect(page.getByTestId('jira_sync_from_date')).toHaveCount(0);
 

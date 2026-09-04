@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\EncryptedCredential;
 use App\Models\Concerns\HasUuids;
 use Database\Factories\GoogleCalendarConnectionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -39,9 +40,19 @@ class GoogleCalendarConnection extends Model
      *
      * @var array<string, string>
      */
+    /**
+     * Never serialized, whatever asks. See the note on JiraConnection.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'access_token',
+        'refresh_token',
+    ];
+
     protected $casts = [
-        'access_token' => 'encrypted',
-        'refresh_token' => 'encrypted',
+        'access_token' => EncryptedCredential::class,
+        'refresh_token' => EncryptedCredential::class,
         'expires_at' => 'datetime',
         'scopes' => 'array',
         'requires_reauthentication' => 'bool',

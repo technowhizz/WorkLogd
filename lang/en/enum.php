@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Enums\BillingInterval;
 use App\Enums\CurrencyFormat;
 use App\Enums\DateFormat;
 use App\Enums\IntervalFormat;
 use App\Enums\NumberFormat;
+use App\Enums\SubscriptionPlan;
+use App\Enums\SubscriptionStatus;
 use App\Enums\TimeFormat;
 use App\Enums\Weekday;
 
@@ -57,6 +60,25 @@ return [
         CurrencyFormat::SymbolAfter->value => '111€',
         CurrencyFormat::SymbolBeforeWithSpace->value => '€ 111',
         CurrencyFormat::SymbolAfterWithSpace->value => '111 €',
+    ],
+
+    'subscription_plan' => [
+        SubscriptionPlan::Free->value => 'Free',
+        SubscriptionPlan::Professional->value => 'Professional',
+        SubscriptionPlan::Enterprise->value => 'Enterprise',
+    ],
+
+    'subscription_status' => [
+        SubscriptionStatus::Trialing->value => 'Trialing',
+        SubscriptionStatus::Active->value => 'Active',
+        SubscriptionStatus::PastDue->value => 'Past due',
+        SubscriptionStatus::Cancelled->value => 'Cancelled',
+        SubscriptionStatus::Expired->value => 'Expired',
+    ],
+
+    'billing_interval' => [
+        BillingInterval::Monthly->value => 'Monthly',
+        BillingInterval::Yearly->value => 'Yearly',
     ],
 
 ];
