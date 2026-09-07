@@ -73,7 +73,11 @@ describe('useTimeEntryUndo', () => {
         const undoer = useTimeEntryUndo();
 
         undoer.remember({ entries: [payload(entry())], label: 'a', restore: first });
-        undoer.remember({ entries: [payload(entry({ id: 'entry-2' }))], label: 'b', restore: second });
+        undoer.remember({
+            entries: [payload(entry({ id: 'entry-2' }))],
+            label: 'b',
+            restore: second,
+        });
         await undoer.undo();
 
         // Only the most recent deletion is undoable - offering a stack would let somebody

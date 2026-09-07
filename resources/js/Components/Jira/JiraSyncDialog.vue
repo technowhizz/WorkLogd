@@ -289,7 +289,12 @@ function confirm() {
                             </ul>
                         </div>
                         <p
-                            v-if="hasFinished && !error && failures.length === 0 && notSent.length === 0"
+                            v-if="
+                                hasFinished &&
+                                !error &&
+                                failures.length === 0 &&
+                                notSent.length === 0
+                            "
                             class="text-sm text-text-secondary"
                             data-testid="jira_sync_success">
                             Everything in this range is now up to date in Jira.

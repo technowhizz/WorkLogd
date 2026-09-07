@@ -5,7 +5,12 @@ import TimeEntryUndoShortcut from './TimeEntryUndoShortcut.vue';
 import { useTimeEntryUndo, type UndoableDeletion } from '@/utils/useTimeEntryUndo';
 
 function press(key: string, modifiers: Partial<KeyboardEventInit> = {}, target?: EventTarget) {
-    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...modifiers });
+    const event = new KeyboardEvent('keydown', {
+        key,
+        bubbles: true,
+        cancelable: true,
+        ...modifiers,
+    });
     (target ?? document).dispatchEvent(event);
 
     return event;

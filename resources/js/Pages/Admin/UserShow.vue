@@ -76,7 +76,11 @@ function impersonate() {
 }
 
 function resendVerification() {
-    router.post(route('admin.users.resend-verification', props.user.id), {}, { preserveScroll: true });
+    router.post(
+        route('admin.users.resend-verification', props.user.id),
+        {},
+        { preserveScroll: true }
+    );
 }
 </script>
 
@@ -89,9 +93,7 @@ function resendVerification() {
                 <AdminBadge v-if="user.is_placeholder">Placeholder</AdminBadge>
             </div>
             <div class="flex items-center gap-2">
-                <SecondaryButton
-                    v-if="!user.email_verified"
-                    @click="resendVerification"
+                <SecondaryButton v-if="!user.email_verified" @click="resendVerification"
                     >Resend verification</SecondaryButton
                 >
                 <SecondaryButton
@@ -117,18 +119,28 @@ function resendVerification() {
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <InputLabel for="name" value="Name" />
-                                <TextInput id="name" v-model="form.name" type="text" class="w-full mt-1" />
+                                <TextInput
+                                    id="name"
+                                    v-model="form.name"
+                                    type="text"
+                                    class="w-full mt-1" />
                                 <p v-if="form.errors.name" class="text-xs text-accent-600 mt-1">
                                     {{ form.errors.name }}
                                 </p>
                             </div>
                             <div>
                                 <InputLabel for="email" value="Email" />
-                                <TextInput id="email" v-model="form.email" type="email" class="w-full mt-1" />
+                                <TextInput
+                                    id="email"
+                                    v-model="form.email"
+                                    type="email"
+                                    class="w-full mt-1" />
                                 <p v-if="form.errors.email" class="text-xs text-accent-600 mt-1">
                                     {{ form.errors.email }}
                                 </p>
-                                <p v-if="user.pending_email" class="text-xs text-text-tertiary mt-1">
+                                <p
+                                    v-if="user.pending_email"
+                                    class="text-xs text-text-tertiary mt-1">
                                     Change to {{ user.pending_email }} is awaiting confirmation.
                                 </p>
                             </div>
@@ -138,7 +150,10 @@ function resendVerification() {
                                     id="timezone"
                                     v-model="form.timezone"
                                     class="mt-1 w-full rounded-md border-input-border bg-input-background text-text-primary text-sm">
-                                    <option v-for="(label, value) in options.timezones" :key="value" :value="value">
+                                    <option
+                                        v-for="(label, value) in options.timezones"
+                                        :key="value"
+                                        :value="value">
                                         {{ label }}
                                     </option>
                                 </select>
@@ -149,7 +164,10 @@ function resendVerification() {
                                     id="week_start"
                                     v-model="form.week_start"
                                     class="mt-1 w-full rounded-md border-input-border bg-input-background text-text-primary text-sm">
-                                    <option v-for="(label, value) in options.weekdays" :key="value" :value="value">
+                                    <option
+                                        v-for="(label, value) in options.weekdays"
+                                        :key="value"
+                                        :value="value">
                                         {{ label }}
                                     </option>
                                 </select>
@@ -175,7 +193,9 @@ function resendVerification() {
                                     :class="adminLocked ? 'opacity-40 pointer-events-none' : ''" />
                                 <span>
                                     <span class="text-text-primary">Super admin</span>
-                                    <span class="block text-xs text-text-tertiary">{{ adminLockReason }}</span>
+                                    <span class="block text-xs text-text-tertiary">{{
+                                        adminLockReason
+                                    }}</span>
                                 </span>
                             </label>
                             <label class="flex items-center gap-2 text-sm">
@@ -185,7 +205,9 @@ function resendVerification() {
                         </div>
 
                         <div class="pt-2">
-                            <PrimaryButton type="submit" :loading="form.processing">Save</PrimaryButton>
+                            <PrimaryButton type="submit" :loading="form.processing"
+                                >Save</PrimaryButton
+                            >
                         </div>
                     </form>
                 </Card>
@@ -196,7 +218,9 @@ function resendVerification() {
                             <h4 class="font-medium text-text-primary">At a glance</h4>
                             <div class="flex justify-between">
                                 <span class="text-text-tertiary">Joined</span>
-                                <span class="text-text-primary">{{ formatDate(user.created_at) }}</span>
+                                <span class="text-text-primary">{{
+                                    formatDate(user.created_at)
+                                }}</span>
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-text-tertiary">Email</span>
@@ -225,11 +249,15 @@ function resendVerification() {
                                         {{ organization.name }}
                                     </Link>
                                     <div class="flex items-center gap-1.5 shrink-0">
-                                        <AdminBadge v-if="organization.is_owner" tone="info">Owner</AdminBadge>
+                                        <AdminBadge v-if="organization.is_owner" tone="info"
+                                            >Owner</AdminBadge
+                                        >
                                         <AdminBadge>{{ organization.role }}</AdminBadge>
                                     </div>
                                 </div>
-                                <p v-if="organizations.length === 0" class="py-3 text-sm text-text-tertiary">
+                                <p
+                                    v-if="organizations.length === 0"
+                                    class="py-3 text-sm text-text-tertiary">
                                     Belongs to no organization.
                                 </p>
                             </div>

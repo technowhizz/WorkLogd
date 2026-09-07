@@ -6,9 +6,7 @@ import TableRow from '@/Components/TableRow.vue';
 import AdminTable, { type AdminColumn } from '@/Components/Admin/AdminTable.vue';
 import AdminTableCell from '@/Components/Admin/AdminTableCell.vue';
 import AdminFilterBar from '@/Components/Admin/AdminFilterBar.vue';
-import AdminPagination, {
-    type AdminPaginatorMeta,
-} from '@/Components/Admin/AdminPagination.vue';
+import AdminPagination, { type AdminPaginatorMeta } from '@/Components/Admin/AdminPagination.vue';
 import AdminBadge from '@/Components/Admin/AdminBadge.vue';
 import BillingStats, { type BillingStatsPayload } from '@/Components/Admin/BillingStats.vue';
 import { PrimaryButton } from '@/packages/ui/src';
@@ -138,7 +136,9 @@ const plans = props.options.plans;
                         <div class="tabular-nums text-text-primary">
                             {{ formatMoney(subscription.price, subscription.currency) }}
                         </div>
-                        <div v-if="subscription.billing_interval" class="text-xs text-text-tertiary">
+                        <div
+                            v-if="subscription.billing_interval"
+                            class="text-xs text-text-tertiary">
                             {{ subscription.billing_interval }}
                         </div>
                     </div>

@@ -59,7 +59,9 @@ function resize() {
 
     const min = lineHeight * props.minRows + vertical;
     const max = lineHeight * props.maxRows + vertical;
-    const wanted = element.scrollHeight + Number.parseFloat(styles.borderTopWidth) +
+    const wanted =
+        element.scrollHeight +
+        Number.parseFloat(styles.borderTopWidth) +
         Number.parseFloat(styles.borderBottomWidth);
 
     element.style.height = `${Math.min(Math.max(wanted, min), max)}px`;

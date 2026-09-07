@@ -11,10 +11,7 @@ import ApiTokensForm from '@/Pages/Profile/Partials/ApiTokensForm.vue';
 import ThemeForm from '@/Pages/Profile/Partials/ThemeForm.vue';
 import GoogleCalendarForm from '@/Pages/Profile/Partials/GoogleCalendarForm.vue';
 import GoogleCalendarUpgradeNotice from '@/Pages/Profile/Partials/GoogleCalendarUpgradeNotice.vue';
-import {
-    googleCalendarRequiresUpgrade,
-    isGoogleCalendarEnabled,
-} from '@/utils/googleCalendar';
+import { googleCalendarRequiresUpgrade, isGoogleCalendarEnabled } from '@/utils/googleCalendar';
 import JiraForm from '@/Pages/Profile/Partials/JiraForm.vue';
 import { isJiraEnabled } from '@/utils/jira';
 

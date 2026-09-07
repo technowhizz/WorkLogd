@@ -10,7 +10,9 @@ import { getDayJsInstance } from '../utils/time';
  */
 
 /** The fields a copy of an entry carries over. Deliberately not the id, start or end. */
-function copyableFields(entry: TimeEntry): Omit<CreateTimeEntryBody, 'member_id' | 'start' | 'end'> {
+function copyableFields(
+    entry: TimeEntry
+): Omit<CreateTimeEntryBody, 'member_id' | 'start' | 'end'> {
     return {
         billable: entry.billable,
         type: entry.type,
@@ -21,9 +23,7 @@ function copyableFields(entry: TimeEntry): Omit<CreateTimeEntryBody, 'member_id'
     } as Omit<CreateTimeEntryBody, 'member_id' | 'start' | 'end'>;
 }
 
-export function duplicatePayload(
-    entry: TimeEntry
-): Omit<CreateTimeEntryBody, 'member_id'> | null {
+export function duplicatePayload(entry: TimeEntry): Omit<CreateTimeEntryBody, 'member_id'> | null {
     if (entry.end === null) {
         return null;
     }

@@ -5,13 +5,7 @@ import MainContainer from '@/packages/ui/src/MainContainer.vue';
 import Card from '@/Components/Common/Card.vue';
 import AdminBadge from '@/Components/Admin/AdminBadge.vue';
 import AdminDangerDialog from '@/Components/Admin/AdminDangerDialog.vue';
-import {
-    InputLabel,
-    PrimaryButton,
-    SecondaryButton,
-    TextInput,
-    Checkbox,
-} from '@/packages/ui/src';
+import { InputLabel, PrimaryButton, SecondaryButton, TextInput, Checkbox } from '@/packages/ui/src';
 import { BuildingOffice2Icon } from '@heroicons/vue/20/solid';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
@@ -133,7 +127,11 @@ function submitImport() {
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <InputLabel for="name" value="Name" />
-                                <TextInput id="name" v-model="form.name" type="text" class="w-full mt-1" />
+                                <TextInput
+                                    id="name"
+                                    v-model="form.name"
+                                    type="text"
+                                    class="w-full mt-1" />
                                 <p v-if="form.errors.name" class="text-xs text-accent-600 mt-1">
                                     {{ form.errors.name }}
                                 </p>
@@ -144,7 +142,10 @@ function submitImport() {
                                     id="currency"
                                     v-model="form.currency"
                                     class="mt-1 w-full rounded-md border-input-border bg-input-background text-text-primary text-sm">
-                                    <option v-for="(label, code) in options.currencies" :key="code" :value="code">
+                                    <option
+                                        v-for="(label, code) in options.currencies"
+                                        :key="code"
+                                        :value="code">
                                         {{ label }}
                                     </option>
                                 </select>
@@ -156,7 +157,9 @@ function submitImport() {
                                     v-model="form.billable_rate"
                                     type="number"
                                     class="w-full mt-1" />
-                                <p v-if="form.errors.billable_rate" class="text-xs text-accent-600 mt-1">
+                                <p
+                                    v-if="form.errors.billable_rate"
+                                    class="text-xs text-accent-600 mt-1">
                                     {{ form.errors.billable_rate }}
                                 </p>
                             </div>
@@ -166,7 +169,10 @@ function submitImport() {
                                     id="date_format"
                                     v-model="form.date_format"
                                     class="mt-1 w-full rounded-md border-input-border bg-input-background text-text-primary text-sm">
-                                    <option v-for="(label, value) in options.date_format" :key="value" :value="value">
+                                    <option
+                                        v-for="(label, value) in options.date_format"
+                                        :key="value"
+                                        :value="value">
                                         {{ label }}
                                     </option>
                                 </select>
@@ -177,7 +183,10 @@ function submitImport() {
                                     id="time_format"
                                     v-model="form.time_format"
                                     class="mt-1 w-full rounded-md border-input-border bg-input-background text-text-primary text-sm">
-                                    <option v-for="(label, value) in options.time_format" :key="value" :value="value">
+                                    <option
+                                        v-for="(label, value) in options.time_format"
+                                        :key="value"
+                                        :value="value">
                                         {{ label }}
                                     </option>
                                 </select>
@@ -188,7 +197,10 @@ function submitImport() {
                                     id="interval_format"
                                     v-model="form.interval_format"
                                     class="mt-1 w-full rounded-md border-input-border bg-input-background text-text-primary text-sm">
-                                    <option v-for="(label, value) in options.interval_format" :key="value" :value="value">
+                                    <option
+                                        v-for="(label, value) in options.interval_format"
+                                        :key="value"
+                                        :value="value">
                                         {{ label }}
                                     </option>
                                 </select>
@@ -199,7 +211,10 @@ function submitImport() {
                                     id="number_format"
                                     v-model="form.number_format"
                                     class="mt-1 w-full rounded-md border-input-border bg-input-background text-text-primary text-sm">
-                                    <option v-for="(label, value) in options.number_format" :key="value" :value="value">
+                                    <option
+                                        v-for="(label, value) in options.number_format"
+                                        :key="value"
+                                        :value="value">
                                         {{ label }}
                                     </option>
                                 </select>
@@ -210,7 +225,10 @@ function submitImport() {
                                     id="currency_format"
                                     v-model="form.currency_format"
                                     class="mt-1 w-full rounded-md border-input-border bg-input-background text-text-primary text-sm">
-                                    <option v-for="(label, value) in options.currency_format" :key="value" :value="value">
+                                    <option
+                                        v-for="(label, value) in options.currency_format"
+                                        :key="value"
+                                        :value="value">
                                         {{ label }}
                                     </option>
                                 </select>
@@ -237,7 +255,9 @@ function submitImport() {
                         </div>
 
                         <div class="pt-2">
-                            <PrimaryButton type="submit" :loading="form.processing">Save</PrimaryButton>
+                            <PrimaryButton type="submit" :loading="form.processing"
+                                >Save</PrimaryButton
+                            >
                         </div>
                     </form>
                 </Card>
@@ -248,23 +268,36 @@ function submitImport() {
                             <h4 class="font-medium text-text-primary">At a glance</h4>
                             <div class="flex justify-between">
                                 <span class="text-text-tertiary">Owner</span>
-                                <span class="text-text-primary truncate">{{ organization.owner_email ?? '--' }}</span>
+                                <span class="text-text-primary truncate">{{
+                                    organization.owner_email ?? '--'
+                                }}</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-text-tertiary">Members</span>
-                                <span class="text-text-primary">{{ organization.members_count ?? 0 }}</span>
+                                <span class="text-text-primary">{{
+                                    organization.members_count ?? 0
+                                }}</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-text-tertiary">Created</span>
-                                <span class="text-text-primary">{{ formatDate(organization.created_at) }}</span>
+                                <span class="text-text-primary">{{
+                                    formatDate(organization.created_at)
+                                }}</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-text-tertiary">Jira site</span>
-                                <span class="text-text-primary truncate">{{ organization.jira_site_url ?? '--' }}</span>
+                                <span class="text-text-primary truncate">{{
+                                    organization.jira_site_url ?? '--'
+                                }}</span>
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-text-tertiary">Plan</span>
-                                <AdminBadge :tone="organization.plan && organization.plan !== 'free' ? 'success' : 'neutral'">
+                                <AdminBadge
+                                    :tone="
+                                        organization.plan && organization.plan !== 'free'
+                                            ? 'success'
+                                            : 'neutral'
+                                    ">
                                     {{ organization.plan ?? 'None' }}
                                 </AdminBadge>
                             </div>
@@ -280,22 +313,33 @@ function submitImport() {
                             <input
                                 type="file"
                                 class="block w-full text-sm text-text-secondary"
-                                @change="importForm.file = ($event.target as HTMLInputElement).files?.[0] ?? null" />
+                                @change="
+                                    importForm.file =
+                                        ($event.target as HTMLInputElement).files?.[0] ?? null
+                                " />
                             <select
                                 v-model="importForm.type"
                                 class="w-full rounded-md border-input-border bg-input-background text-text-primary text-sm">
-                                <option v-for="importer in options.importers" :key="importer" :value="importer">
+                                <option
+                                    v-for="importer in options.importers"
+                                    :key="importer"
+                                    :value="importer">
                                     {{ importer }}
                                 </option>
                             </select>
                             <select
                                 v-model="importForm.timezone"
                                 class="w-full rounded-md border-input-border bg-input-background text-text-primary text-sm">
-                                <option v-for="(label, value) in options.timezones" :key="value" :value="value">
+                                <option
+                                    v-for="(label, value) in options.timezones"
+                                    :key="value"
+                                    :value="value">
                                     {{ label }}
                                 </option>
                             </select>
-                            <SecondaryButton type="submit" :loading="importForm.processing">Import</SecondaryButton>
+                            <SecondaryButton type="submit" :loading="importForm.processing"
+                                >Import</SecondaryButton
+                            >
                         </form>
                     </Card>
                 </div>
@@ -315,7 +359,9 @@ function submitImport() {
                                 :href="route('admin.users.show', member.id)"
                                 class="min-w-0 hover:text-text-primary transition">
                                 <span class="font-medium text-text-primary">{{ member.name }}</span>
-                                <span class="text-text-tertiary ml-2 truncate">{{ member.email }}</span>
+                                <span class="text-text-tertiary ml-2 truncate">{{
+                                    member.email
+                                }}</span>
                             </Link>
                             <div class="flex items-center gap-2 shrink-0">
                                 <AdminBadge v-if="member.is_placeholder">Placeholder</AdminBadge>

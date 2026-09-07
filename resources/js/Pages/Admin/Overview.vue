@@ -50,11 +50,16 @@ function setRange(range: string) {
                     <AdminStat
                         label="Organizations"
                         :value="organizations.total.toLocaleString()"
-                        :description="organizations.team.toLocaleString() + ' are shared, the rest are personal'" />
+                        :description="
+                            organizations.team.toLocaleString() +
+                            ' are shared, the rest are personal'
+                        " />
                     <AdminStat
                         label="Users"
                         :value="users.total.toLocaleString()"
-                        :description="users.placeholder.toLocaleString() + ' placeholders alongside them'" />
+                        :description="
+                            users.placeholder.toLocaleString() + ' placeholders alongside them'
+                        " />
                     <AdminStat
                         label="Active this week"
                         tone="success"
@@ -76,8 +81,12 @@ function setRange(range: string) {
                 <h3 class="text-sm font-semibold text-text-tertiary">Trends</h3>
                 <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
                     <AdminTrendChart title="User registrations" :points="charts.registrations" />
-                    <AdminTrendChart title="Time entries created" :points="charts.timeEntriesCreated" />
-                    <AdminTrendChart title="Time entries imported" :points="charts.timeEntriesImported" />
+                    <AdminTrendChart
+                        title="Time entries created"
+                        :points="charts.timeEntriesCreated" />
+                    <AdminTrendChart
+                        title="Time entries imported"
+                        :points="charts.timeEntriesImported" />
                 </div>
             </section>
 

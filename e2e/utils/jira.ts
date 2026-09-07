@@ -101,9 +101,7 @@ export async function setJiraSiteUrlViaApi(ctx: TestContext, siteUrl: string | n
  * rather than a test-only side door.
  */
 export async function connectJiraViaApi(ctx: TestContext) {
-    const response = await ctx.request.get(
-        `${PLAYWRIGHT_BASE_URL}/integrations/jira/connect`
-    );
+    const response = await ctx.request.get(`${PLAYWRIGHT_BASE_URL}/integrations/jira/connect`);
     expect([200, 302]).toContain(response.status());
 
     const connection = await ctx.request.get(

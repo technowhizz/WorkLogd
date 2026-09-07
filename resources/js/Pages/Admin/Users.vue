@@ -5,9 +5,7 @@ import TableRow from '@/Components/TableRow.vue';
 import AdminTable, { type AdminColumn } from '@/Components/Admin/AdminTable.vue';
 import AdminTableCell from '@/Components/Admin/AdminTableCell.vue';
 import AdminFilterBar from '@/Components/Admin/AdminFilterBar.vue';
-import AdminPagination, {
-    type AdminPaginatorMeta,
-} from '@/Components/Admin/AdminPagination.vue';
+import AdminPagination, { type AdminPaginatorMeta } from '@/Components/Admin/AdminPagination.vue';
 import AdminBadge from '@/Components/Admin/AdminBadge.vue';
 import { UserGroupIcon } from '@heroicons/vue/20/solid';
 import { formatDate } from '@/Components/Admin/format';
@@ -82,7 +80,9 @@ const columns: AdminColumn[] = [
                     <div class="flex flex-wrap items-center gap-1.5">
                         <AdminBadge v-if="user.is_admin" tone="danger">Super admin</AdminBadge>
                         <AdminBadge v-if="user.is_placeholder">Placeholder</AdminBadge>
-                        <AdminBadge v-if="!user.email_verified" tone="warning">Unverified</AdminBadge>
+                        <AdminBadge v-if="!user.email_verified" tone="warning"
+                            >Unverified</AdminBadge
+                        >
                         <AdminBadge
                             v-if="user.email_verified && !user.is_placeholder && !user.is_admin"
                             tone="success"

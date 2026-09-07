@@ -255,11 +255,12 @@ describe('JiraSyncDialog weekly allowance', () => {
         config.global.renderStubDefaultSlot = false;
     });
 
-    async function openWith(
-        plan: JiraSyncPlan,
-        allowance: SyncState['allowance']['value']
-    ) {
-        const wrapper = mountDialog({ show: false, startDate: '2026-08-10', endDate: '2026-08-16' });
+    async function openWith(plan: JiraSyncPlan, allowance: SyncState['allowance']['value']) {
+        const wrapper = mountDialog({
+            show: false,
+            startDate: '2026-08-10',
+            endDate: '2026-08-16',
+        });
         await wrapper.setProps({ show: true });
         syncState().plan.value = plan;
         syncState().allowance.value = allowance;

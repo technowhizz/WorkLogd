@@ -18,7 +18,8 @@ const toneClasses = computed(
     () =>
         ({
             neutral: 'bg-secondary text-text-secondary border-border-secondary',
-            success: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
+            success:
+                'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
             warning: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
             danger: 'bg-accent-500/10 text-accent-600 dark:text-accent-400 border-accent-500/20',
             info: 'bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20',

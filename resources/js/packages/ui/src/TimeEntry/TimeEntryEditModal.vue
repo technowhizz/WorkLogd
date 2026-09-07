@@ -30,10 +30,7 @@ import { Coffee } from '@lucide/vue';
 import type { CreateTimeEntryBody, Tag, Task } from '@/packages/api/src';
 import TimePickerSimple from '@/packages/ui/src/Input/TimePickerSimple.vue';
 import AutoGrowTextarea from '@/packages/ui/src/Input/AutoGrowTextarea.vue';
-import {
-    duplicatePayload,
-    splitTimeEntry,
-} from '@/packages/ui/src/TimeEntry/timeEntryActions';
+import { duplicatePayload, splitTimeEntry } from '@/packages/ui/src/TimeEntry/timeEntryActions';
 import {
     DropdownMenu,
     DropdownMenuContent,

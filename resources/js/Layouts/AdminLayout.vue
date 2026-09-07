@@ -74,7 +74,8 @@ const appName = computed(() => page.props.app_name ?? "WorkLog'd");
                         <div class="font-display font-semibold text-text-primary truncate">
                             {{ appName }}
                         </div>
-                        <div class="text-2xs font-semibold uppercase tracking-wider text-accent-600">
+                        <div
+                            class="text-2xs font-semibold uppercase tracking-wider text-accent-600">
                             Admin
                         </div>
                     </div>
@@ -89,14 +90,19 @@ const appName = computed(() => page.props.app_name ?? "WorkLog'd");
 
                 <div
                     class="overflow-y-auto flex-1 w-full"
-                    style="scrollbar-width: thin; scrollbar-color: var(--color-bg-primary) transparent">
+                    style="
+                        scrollbar-width: thin;
+                        scrollbar-color: var(--color-bg-primary) transparent;
+                    ">
                     <nav class="pt-2">
                         <ul>
                             <NavigationSidebarItem
                                 title="Overview"
                                 :icon="Squares2X2Icon"
                                 :href="route('admin.overview')"
-                                :current="route().current('admin.overview')"></NavigationSidebarItem>
+                                :current="
+                                    route().current('admin.overview')
+                                "></NavigationSidebarItem>
                             <NavigationSidebarItem
                                 title="Organizations"
                                 :icon="BuildingOffice2Icon"
@@ -135,12 +141,16 @@ const appName = computed(() => page.props.app_name ?? "WorkLog'd");
                                 title="API Tokens"
                                 :icon="KeyIcon"
                                 :href="route('admin.tokens.index')"
-                                :current="route().current('admin.tokens.*')"></NavigationSidebarItem>
+                                :current="
+                                    route().current('admin.tokens.*')
+                                "></NavigationSidebarItem>
                             <NavigationSidebarItem
                                 title="Audit Log"
                                 :icon="ArchiveBoxIcon"
                                 :href="route('admin.audits.index')"
-                                :current="route().current('admin.audits.*')"></NavigationSidebarItem>
+                                :current="
+                                    route().current('admin.audits.*')
+                                "></NavigationSidebarItem>
                             <NavigationSidebarItem
                                 title="Failed Jobs"
                                 :icon="ExclamationTriangleIcon"
@@ -171,7 +181,11 @@ const appName = computed(() => page.props.app_name ?? "WorkLog'd");
                 class="h-screen overflow-y-auto flex flex-col bg-default-background border-l border-default-background-separator">
                 <div
                     class="lg:hidden w-full px-3 py-1 border-b border-b-default-background-separator text-text-secondary flex justify-between items-center">
-                    <Button variant="ghost" size="icon" class="h-7 w-7 shrink-0" @click="openSidebar">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        class="h-7 w-7 shrink-0"
+                        @click="openSidebar">
                         <PanelLeft class="h-4 w-4 text-icon-default" />
                     </Button>
                     <span class="font-display font-semibold text-text-primary"
@@ -189,8 +203,7 @@ const appName = computed(() => page.props.app_name ?? "WorkLog'd");
                     instead of stretching - which is why the app nests it the same way.
                 -->
                 <div class="border-b border-default-background-separator">
-                    <MainContainer
-                        class="py-5 flex flex-wrap gap-3 justify-between items-center">
+                    <MainContainer class="py-5 flex flex-wrap gap-3 justify-between items-center">
                         <slot name="header" />
                     </MainContainer>
                 </div>

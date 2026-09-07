@@ -33,8 +33,7 @@ function sortBy(column: AdminColumn) {
         return;
     }
 
-    const nextDirection =
-        props.sort === column.key && props.direction === 'desc' ? 'asc' : 'desc';
+    const nextDirection = props.sort === column.key && props.direction === 'desc' ? 'asc' : 'desc';
 
     router.get(
         window.location.pathname,

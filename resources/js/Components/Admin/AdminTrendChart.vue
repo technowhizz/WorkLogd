@@ -57,7 +57,9 @@ const option = computed(() => ({
     <Card>
         <div class="px-4 pt-4 flex items-baseline justify-between">
             <h4 class="font-medium text-text-primary text-sm">{{ title }}</h4>
-            <span class="text-sm text-text-tertiary tabular-nums">{{ total.toLocaleString() }}</span>
+            <span class="text-sm text-text-tertiary tabular-nums">{{
+                total.toLocaleString()
+            }}</span>
         </div>
         <VChart
             class="h-52 w-full px-2 pb-2"

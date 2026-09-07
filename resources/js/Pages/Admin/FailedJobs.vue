@@ -5,9 +5,7 @@ import TableRow from '@/Components/TableRow.vue';
 import AdminTable, { type AdminColumn } from '@/Components/Admin/AdminTable.vue';
 import AdminTableCell from '@/Components/Admin/AdminTableCell.vue';
 import AdminFilterBar from '@/Components/Admin/AdminFilterBar.vue';
-import AdminPagination, {
-    type AdminPaginatorMeta,
-} from '@/Components/Admin/AdminPagination.vue';
+import AdminPagination, { type AdminPaginatorMeta } from '@/Components/Admin/AdminPagination.vue';
 import { SecondaryButton } from '@/packages/ui/src';
 import {
     ExclamationTriangleIcon,

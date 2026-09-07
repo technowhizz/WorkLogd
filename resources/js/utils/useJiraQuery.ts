@@ -117,7 +117,6 @@ export function useJiraMutations() {
         queryClient.invalidateQueries({ queryKey: ['jira'] });
     }
 
-
     const { mutateAsync: updateSettings } = useMutation({
         mutationFn: async (body: { sync_from_date: string | null }) =>
             await handleApiRequestNotifications(
@@ -207,8 +206,7 @@ export function useJiraSync() {
             plan.value = response.data;
             // The generated client passes unknown keys through, so this arrives without the
             // endpoint having to be re-described there.
-            allowance.value =
-                (response as { allowance?: JiraSyncAllowance }).allowance ?? null;
+            allowance.value = (response as { allowance?: JiraSyncAllowance }).allowance ?? null;
         } catch (e: unknown) {
             if (request !== latestPlanRequest) {
                 return;

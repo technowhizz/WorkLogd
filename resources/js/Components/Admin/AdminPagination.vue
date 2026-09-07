@@ -38,8 +38,8 @@ function goTo(page: number) {
         v-if="meta.total > 0"
         class="flex items-center justify-between gap-3 py-4 px-4 sm:px-6 lg:px-8 3xl:px-12 border-t border-default-background-separator">
         <div class="text-sm text-text-tertiary">
-            Showing {{ meta.from ?? 0 }}–{{ meta.to ?? 0 }} of
-            {{ meta.total.toLocaleString() }} {{ itemLabel ?? 'results' }}
+            Showing {{ meta.from ?? 0 }}–{{ meta.to ?? 0 }} of {{ meta.total.toLocaleString() }}
+            {{ itemLabel ?? 'results' }}
         </div>
         <div class="flex items-center gap-2">
             <SecondaryButton

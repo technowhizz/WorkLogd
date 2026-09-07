@@ -23,7 +23,6 @@ import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import TimeEntryGroupedTable from '@/packages/ui/src/TimeEntry/TimeEntryGroupedTable.vue';
 import { statusRangeForEntries } from '@/utils/jira';
 import { useJiraIndicators } from '@/utils/useJiraQuery';
-import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 import { useTagsQuery } from '@/utils/useTagsQuery';
 import { useClientsQuery } from '@/utils/useClientsQuery';
 import { getOrganizationCurrencyString } from '@/utils/money';

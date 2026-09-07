@@ -109,7 +109,10 @@ function destroy() {
                             :disabled="!isNew"
                             class="mt-1 w-full rounded-md border-input-border bg-input-background text-text-primary text-sm disabled:opacity-60">
                             <option value="" disabled>Choose an organization</option>
-                            <option v-for="option in organizations" :key="option.id" :value="option.id">
+                            <option
+                                v-for="option in organizations"
+                                :key="option.id"
+                                :value="option.id">
                                 {{ option.name }}
                             </option>
                         </select>
@@ -129,7 +132,10 @@ function destroy() {
                                 id="plan"
                                 v-model="form.plan"
                                 class="mt-1 w-full rounded-md border-input-border bg-input-background text-text-primary text-sm">
-                                <option v-for="(label, value) in options.plans" :key="value" :value="value">
+                                <option
+                                    v-for="(label, value) in options.plans"
+                                    :key="value"
+                                    :value="value">
                                     {{ label }}
                                 </option>
                             </select>
@@ -140,7 +146,10 @@ function destroy() {
                                 id="status"
                                 v-model="form.status"
                                 class="mt-1 w-full rounded-md border-input-border bg-input-background text-text-primary text-sm">
-                                <option v-for="(label, value) in options.statuses" :key="value" :value="value">
+                                <option
+                                    v-for="(label, value) in options.statuses"
+                                    :key="value"
+                                    :value="value">
                                     {{ label }}
                                 </option>
                             </select>
@@ -179,7 +188,11 @@ function destroy() {
                         </div>
                         <div>
                             <InputLabel for="seats" value="Seats" />
-                            <TextInput id="seats" v-model="form.seats" type="number" class="w-full mt-1" />
+                            <TextInput
+                                id="seats"
+                                v-model="form.seats"
+                                type="number"
+                                class="w-full mt-1" />
                             <p class="text-xs text-text-tertiary mt-1">
                                 Real members paid for. Empty means no cap.
                             </p>
@@ -190,7 +203,11 @@ function destroy() {
 
                         <div>
                             <InputLabel for="price" value="Price per interval (in cents)" />
-                            <TextInput id="price" v-model="form.price" type="number" class="w-full mt-1" />
+                            <TextInput
+                                id="price"
+                                v-model="form.price"
+                                type="number"
+                                class="w-full mt-1" />
                             <p v-if="form.errors.price" class="text-xs text-accent-600 mt-1">
                                 {{ form.errors.price }}
                             </p>
@@ -202,7 +219,10 @@ function destroy() {
                                 v-model="form.billing_interval"
                                 class="mt-1 w-full rounded-md border-input-border bg-input-background text-text-primary text-sm">
                                 <option value="">Not set</option>
-                                <option v-for="(label, value) in options.intervals" :key="value" :value="value">
+                                <option
+                                    v-for="(label, value) in options.intervals"
+                                    :key="value"
+                                    :value="value">
                                     {{ label }}
                                 </option>
                             </select>
@@ -215,7 +235,10 @@ function destroy() {
                                 v-model="form.currency"
                                 class="mt-1 w-full rounded-md border-input-border bg-input-background text-text-primary text-sm">
                                 <option value="">Not set</option>
-                                <option v-for="(label, code) in options.currencies" :key="code" :value="code">
+                                <option
+                                    v-for="(label, code) in options.currencies"
+                                    :key="code"
+                                    :value="code">
                                     {{ label }}
                                 </option>
                             </select>
