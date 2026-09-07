@@ -156,6 +156,22 @@ export async function setShowMissingTicketHintsViaApi(ctx: TestContext, value: b
     await updateUserViaApi(ctx, { show_missing_ticket_hints: value });
 }
 
+/**
+ * The response behind a user setting saved from the UI rather than through the API above.
+ *
+ * The controls that write to the user - the "no ticket" checkbox among them - save
+ * optimistically: the setter fires the request and does not await it, so a `page.goto` on the
+ * following line cancels it and the setting is silently lost. Pair the click with this.
+ */
+export function waitForUserSaved(page: Page) {
+    return page.waitForResponse(
+        (response) =>
+            /\/api\/v1\/users\/[^/]+$/.test(new URL(response.url()).pathname) &&
+            response.request().method() === 'PUT' &&
+            response.status() === 200
+    );
+}
+
 /** Fewer than seven columns on the calendar, which the default sync range has to follow. */
 export async function setCalendarWeekDaysViaApi(ctx: TestContext, days: number) {
     await updateUserViaApi(ctx, { calendar_week_days: days });

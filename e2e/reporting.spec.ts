@@ -1058,9 +1058,17 @@ test('test that clicking a bar on the reporting chart opens the calendar on that
         await createTimeEntryOnDateViaApi(ctx, { date, duration: '1h' });
     }
 
+    /*
+     * The page fires two aggregates and only the graph's buckets are time buckets, so match it
+     * by `fill_gaps_in_time_groups` - the one parameter only it sends. Matching any aggregate
+     * races the table's, whose grouping is the user's choice: on a project grouping the "no
+     * project" bucket has a null key, and the expected URL comes out as `?date=null`.
+     */
     const aggregate = page.waitForResponse(
         (response) =>
-            response.url().includes('/time-entries/aggregate') && response.status() === 200
+            response.url().includes('/time-entries/aggregate') &&
+            response.url().includes('fill_gaps_in_time_groups=true') &&
+            response.status() === 200
     );
     await goToReporting(page);
     const buckets = (await (await aggregate).json()).data.grouped_data as { key: string }[];

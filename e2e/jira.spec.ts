@@ -23,6 +23,7 @@ import {
     setJiraSiteUrlViaApi,
     setJiraSyncFromDateViaApi,
     setShowMissingTicketHintsViaApi,
+    waitForUserSaved,
     localDate,
     localTimestamp,
     localWeekday,
@@ -1047,7 +1048,15 @@ test('test that the profile toggle marks entries with no ticket everywhere', asy
 
     // Act: turn it on from the profile settings card, with no Jira account connected
     await page.goto(PLAYWRIGHT_BASE_URL + '/user/profile');
-    await page.getByTestId('jira_missing_ticket_toggle').click();
+    /*
+     * The checkbox saves optimistically - `showMissingTicketHintsSetting`'s setter fires the PUT
+     * and does not await it - so navigating on the next line cancels the request in flight and
+     * the setting never lands. Wait for the response rather than the click.
+     */
+    await Promise.all([
+        waitForUserSaved(page),
+        page.getByTestId('jira_missing_ticket_toggle').click(),
+    ]);
 
     // Assert: the calendar marks the entry without a ticket, and only that one
     await page.goto(PLAYWRIGHT_BASE_URL + '/calendar');
@@ -1063,7 +1072,10 @@ test('test that the profile toggle marks entries with no ticket everywhere', asy
 
     // Act: turning it off clears them again
     await page.goto(PLAYWRIGHT_BASE_URL + '/user/profile');
-    await page.getByTestId('jira_missing_ticket_toggle').click();
+    await Promise.all([
+        waitForUserSaved(page),
+        page.getByTestId('jira_missing_ticket_toggle').click(),
+    ]);
 
     // Assert
     await page.goto(PLAYWRIGHT_BASE_URL + '/calendar');
