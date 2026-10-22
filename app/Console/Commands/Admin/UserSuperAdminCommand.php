@@ -31,6 +31,11 @@ class UserSuperAdminCommand extends Command
     public function handle(): int
     {
         $email = $this->argument('email');
+        if (! is_string($email)) {
+            $this->error('The email argument must be a string.');
+
+            return self::INVALID;
+        }
         $revoke = (bool) $this->option('revoke');
 
         /** @var User|null $user */

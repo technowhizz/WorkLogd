@@ -14,10 +14,12 @@
 # Seeded 2026-07-25 from the authors of every merged pull request.
 
 agross
+akolenda
 bufferhead-code
 candideu
 kasparrosin
 korridor
+nikbucher tasks table sorting
 onatcer
 shrootbuck
 smilebeda

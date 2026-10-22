@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web\Admin;
 
-use Brick\Money\ISOCurrencyProvider;
+use Brick\Money\IsoCurrencyProvider;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -21,7 +21,7 @@ abstract class Controller extends \App\Http\Controllers\Controller
      * offers so a hand-edited query string cannot order by anything it likes.
      *
      * @param  array<int, string>  $sortable
-     * @return array{0: string, 1: string}
+     * @return array{0: string, 1: 'asc'|'desc'}
      */
     protected function sort(Request $request, array $sortable, string $default): array
     {
@@ -92,7 +92,7 @@ abstract class Controller extends \App\Http\Controllers\Controller
     protected function currencyOptions(): array
     {
         $options = [];
-        foreach (ISOCurrencyProvider::getInstance()->getAvailableCurrencies() as $currency) {
+        foreach (IsoCurrencyProvider::getInstance()->getAvailableCurrencies() as $currency) {
             $options[$currency->getCurrencyCode()] = $currency->getName().' ('.$currency->getCurrencyCode().')';
         }
 

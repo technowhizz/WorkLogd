@@ -29,8 +29,7 @@ const formatted = computed(() => {
         <pre
             v-if="formatted"
             class="text-xs bg-card-background border border-card-border rounded-lg p-3 overflow-x-auto text-text-secondary max-h-64"
-            >{{ formatted }}</pre
-        >
+            >{{ formatted }}</pre>
         <p v-else class="text-xs text-text-tertiary italic">Nothing recorded.</p>
     </div>
 </template>

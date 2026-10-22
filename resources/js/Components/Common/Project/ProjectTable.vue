@@ -6,17 +6,12 @@ import { computed, ref, watch } from 'vue';
 import ProjectCreateModal from '@/packages/ui/src/Project/ProjectCreateModal.vue';
 import ProjectTableHeading from '@/Components/Common/Project/ProjectTableHeading.vue';
 import ProjectTableRow from '@/Components/Common/Project/ProjectTableRow.vue';
-import Pagination from '@/Components/Common/Pagination.vue';
+import Pagination from '@/packages/ui/src/Pagination.vue';
+import LoadingSpinner from '@/packages/ui/src/LoadingSpinner.vue';
 
 export type SortColumn =
-    | 'name'
-    | 'client_name'
-    | 'spent_time'
-    | 'progress'
-    | 'billable_rate'
-    | 'status'
-    | 'visibility';
-export type SortDirection = 'asc' | 'desc';
+    'name' | 'client_name' | 'spent_time' | 'progress' | 'billable_rate' | 'status' | 'visibility';
+export type { SortDirection } from '@/utils/useSortableTable';
 import { canCreateProjects } from '@/utils/permissions';
 import type { CreateProjectBody, Project, Client, CreateClientBody } from '@/packages/api/src';
 import { useProjectsStore } from '@/utils/useProjects';
@@ -27,20 +22,24 @@ import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
 import { getCurrentOrganizationId } from '@/utils/useUser';
 import {
-    useVueTable,
-    getCoreRowModel,
-    getSortedRowModel,
-    type SortingState,
-} from '@tanstack/vue-table';
+    useSortableTable,
+    type SortableColumnDef,
+    type SortDirection,
+} from '@/utils/useSortableTable';
 
 const { organization } = useOrganizationQuery(getCurrentOrganizationId()!);
 
-const props = defineProps<{
-    projects: Project[];
-    showBillableRate: boolean;
-    sortColumn: SortColumn;
-    sortDirection: SortDirection;
-}>();
+const props = withDefaults(
+    defineProps<{
+        projects: Project[];
+        showBillableRate: boolean;
+        sortColumn: SortColumn;
+        sortDirection: SortDirection;
+        isFiltered?: boolean;
+        isLoading?: boolean;
+    }>(),
+    { isFiltered: false, isLoading: false }
+);
 
 const emit = defineEmits<{
     sort: [column: SortColumn, direction: SortDirection];
@@ -57,28 +56,16 @@ const clientNameMap = computed(() => {
     return map;
 });
 
-// Convert sort props to TanStack Table format.
-// Name is always the secondary sort so rows with equal values render
-// alphabetically instead of in API (created_at) order.
-const sorting = computed<SortingState>(() => [
-    {
-        id: props.sortColumn,
-        desc: props.sortDirection === 'desc',
-    },
-    ...(props.sortColumn !== 'name' ? [{ id: 'name', desc: false }] : []),
-]);
-
 // Define column accessors for sorting.
 // Numeric columns use sortDescFirst so that the first click (chevron down) sorts highest-first,
 // while text columns default to ascending (A-Z) on first click (chevron down).
-const columns = computed(() => [
+const columns = computed<SortableColumnDef<Project, SortColumn>[]>(() => [
     {
         id: 'name',
         accessorFn: (row: Project) => row.name.toLowerCase(),
     },
     {
         id: 'client_name',
-        sortUndefined: 'last' as const,
         accessorFn: (row: Project) => {
             if (!row.client_id) return undefined;
             return (clientNameMap.value.get(row.client_id) ?? '').toLowerCase();
@@ -87,12 +74,11 @@ const columns = computed(() => [
     {
         id: 'spent_time',
         sortDescFirst: true,
-        accessorFn: (row: Project) => row.spent_time ?? 0,
+        accessorFn: (row: Project) => row.spent_time,
     },
     {
         id: 'progress',
         sortDescFirst: true,
-        sortUndefined: 'last' as const,
         accessorFn: (row: Project) => {
             if (!row.estimated_time) return undefined;
             return (row.spent_time / row.estimated_time) * 100;
@@ -101,7 +87,7 @@ const columns = computed(() => [
     {
         id: 'billable_rate',
         sortDescFirst: true,
-        accessorFn: (row: Project) => row.billable_rate ?? 0,
+        accessorFn: (row: Project) => row.billable_rate,
     },
     {
         id: 'status',
@@ -113,39 +99,21 @@ const columns = computed(() => [
     },
 ]);
 
-// Columns with sortDescFirst get desc as default direction on first click.
-const descFirstColumns = new Set<SortColumn>(
-    columns.value.filter((c) => c.sortDescFirst).map((c) => c.id as SortColumn)
-);
+const {
+    sortedRows: sortedProjects,
+    descFirstColumns,
+    nextDirection,
+} = useSortableTable({
+    data: () => props.projects,
+    columns: () => columns.value,
+    sortColumn: () => props.sortColumn,
+    sortDirection: () => props.sortDirection,
+    tieBreakColumn: 'name',
+});
 
 function handleSort(column: SortColumn) {
-    if (props.sortColumn === column) {
-        emit('sort', column, props.sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-        emit('sort', column, descFirstColumns.has(column) ? 'desc' : 'asc');
-    }
+    emit('sort', column, nextDirection(column));
 }
-
-const table = useVueTable({
-    get data() {
-        return props.projects;
-    },
-    get columns() {
-        return columns.value;
-    },
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    state: {
-        get sorting() {
-            return sorting.value;
-        },
-    },
-    manualSorting: false,
-});
-
-const sortedProjects = computed(() => {
-    return table.getRowModel().rows.map((row) => row.original);
-});
 
 // Client-side pagination: the full list is in memory, only one page is mounted at a time.
 const perPage = defineModel<number>('perPage', { default: 15 });
@@ -158,6 +126,28 @@ watch([() => props.sortColumn, () => props.sortDirection, () => props.projects, 
 const paginatedProjects = computed(() => {
     const start = (currentPage.value - 1) * perPage.value;
     return sortedProjects.value.slice(start, start + perPage.value);
+});
+
+const emptyState = computed(() => {
+    if (props.isFiltered) {
+        return {
+            title: 'No matching projects',
+            description: 'Try a different search term or adjust your filters.',
+            showCreateButton: false,
+        };
+    }
+    if (!canCreateProjects()) {
+        return {
+            title: 'You are not a member of any projects',
+            description: 'Ask your manager to add you to a project as a team member.',
+            showCreateButton: false,
+        };
+    }
+    return {
+        title: 'No projects found',
+        description: 'Create your first project now!',
+        showCreateButton: true,
+    };
 });
 
 const showCreateProjectModal = ref(false);
@@ -193,24 +183,21 @@ const gridTemplate = computed(() => {
                     :sort-direction="props.sortDirection"
                     :desc-first-columns="descFirstColumns"
                     @sort="handleSort"></ProjectTableHeading>
-                <div v-if="sortedProjects.length === 0" class="col-span-full py-24 text-center">
+                <div
+                    v-if="props.isLoading"
+                    class="col-span-full flex justify-center items-center py-24">
+                    <LoadingSpinner></LoadingSpinner>
+                </div>
+                <div
+                    v-else-if="sortedProjects.length === 0"
+                    class="col-span-full py-24 text-center">
                     <FolderPlusIcon class="w-8 text-icon-default inline pb-2"></FolderPlusIcon>
-                    <h3 class="text-text-primary font-semibold">
-                        {{
-                            canCreateProjects()
-                                ? 'No projects found'
-                                : 'You are not a member of any projects'
-                        }}
-                    </h3>
+                    <h3 class="text-text-primary font-semibold">{{ emptyState.title }}</h3>
                     <p class="pb-5 max-w-md mx-auto text-sm pt-1">
-                        {{
-                            canCreateProjects()
-                                ? 'Create your first project now!'
-                                : 'Ask your manager to add you to a project as a team member.'
-                        }}
+                        {{ emptyState.description }}
                     </p>
                     <SecondaryButton
-                        v-if="canCreateProjects()"
+                        v-if="emptyState.showCreateButton"
                         :icon="PlusIcon"
                         @click="showCreateProjectModal = true"
                         >Create your First Project

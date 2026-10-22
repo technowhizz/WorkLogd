@@ -20,6 +20,7 @@ import type {
 } from '@/packages/api/src';
 import TagDropdown from '@/packages/ui/src/Tag/TagDropdown.vue';
 import BillableIcon from '@/packages/ui/src/Icons/BillableIcon.vue';
+import { useBillableRatesLock } from '@/packages/ui/src/utils/useBillableRatesLock';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '..';
 import { Button } from '@/packages/ui/src/Buttons';
 import DatePicker from '@/packages/ui/src/Input/DatePicker.vue';
@@ -81,6 +82,7 @@ watch(show, (value) => {
 });
 
 const editableTimeEntry = ref<TimeEntry | null>(null);
+const { locked: billableRatesLocked } = useBillableRatesLock();
 
 watch(
     () => props.timeEntry,
@@ -233,6 +235,11 @@ async function deleteEntry() {
     }
 }
 
+// Organizations with locked billable rates can not make a non-billable time entry billable
+const billableOptionLocked = computed(
+    () => billableRatesLocked.value && !props.timeEntry?.billable
+);
+
 const billableProxy = computed({
     get: () =>
         editableTimeEntry.value ? (editableTimeEntry.value.billable ? 'true' : 'false') : 'false',
@@ -278,7 +285,7 @@ const externalReference = computed(() =>
 </script>
 
 <template>
-    <DialogModal closeable :show="show" @close="show = false">
+    <DialogModal closeable :show="show" @close="show = false" @submit="submit">
         <template #title>
             <div class="flex space-x-2">
                 <span> Edit time entry </span>
@@ -391,7 +398,9 @@ const externalReference = computed(() =>
                                 </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="true">Billable</SelectItem>
+                                <SelectItem value="true" :disabled="billableOptionLocked"
+                                    >Billable</SelectItem
+                                >
                                 <SelectItem value="false">Non Billable</SelectItem>
                             </SelectContent>
                         </Select>

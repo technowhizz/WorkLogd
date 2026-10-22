@@ -33,6 +33,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Throwable;
 
 class MemberController extends Controller
 {
@@ -46,8 +47,6 @@ class MemberController extends Controller
 
     /**
      * List all members of an organization
-     *
-     * @return MemberCollection<MemberResource>
      *
      * @throws AuthorizationException
      *
@@ -82,10 +81,9 @@ class MemberController extends Controller
     {
         $this->checkPermission($organization, 'members:update', $member);
 
-        if ($request->has('billable_rate') && $member->billable_rate !== $request->getBillableRate()) {
+        $oldBillableRate = $member->billable_rate;
+        if ($request->has('billable_rate') && $this->canUseBillableRates($organization)) {
             $member->billable_rate = $request->getBillableRate();
-
-            $billableRateService->updateTimeEntriesBillableRateForMember($member);
         }
         if ($request->has('role') && $member->role !== $request->getRole()->value) {
             $newRole = $request->getRole();
@@ -93,6 +91,10 @@ class MemberController extends Controller
             $memberService->changeRole($member, $organization, $newRole, $allowOwnerChange);
         }
         $member->save();
+
+        if ($oldBillableRate !== $member->billable_rate) {
+            $billableRateService->updateTimeEntriesBillableRateForMember($member);
+        }
 
         return new MemberResource($member);
     }
@@ -144,9 +146,12 @@ class MemberController extends Controller
     /**
      * Merge one member into another
      *
+     * Only placeholder members (for example people created by an import) can be merged. All time entries and other data of the placeholder
+     * are reassigned to the member given in `member_id`, and the placeholder is removed. Find both member IDs with `GET /organizations/{organization}/members`.
+     *
      * @throws AuthorizationException
      * @throws OnlyPlaceholdersCanBeMergedIntoAnotherMember
-     * @throws \Throwable
+     * @throws Throwable
      *
      * @operationId mergeMember
      */

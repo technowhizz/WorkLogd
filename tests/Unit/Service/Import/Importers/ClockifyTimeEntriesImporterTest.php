@@ -250,4 +250,51 @@ class ClockifyTimeEntriesImporterTest extends ImporterTestAbstract
         $this->assertSame(0, Tag::query()->count());
         $this->assertSame(0, Client::query()->count());
     }
+
+    public function test_import_fails_if_end_is_before_start(): void
+    {
+        // Arrange
+        $organization = Organization::factory()->create();
+        $timezone = 'Europe/Vienna';
+        $importer = new ClockifyTimeEntriesImporter;
+        $importer->init($organization);
+        $data = <<<'CSV'
+        "Project","Client","Description","Task","User","Group","Email","Tags","Billable","Start Date","Start Time","End Date","End Time","Duration (h)","Duration (decimal)","Billable Rate (USD)","Billable Amount (USD)"
+        "Project","Client","Working hard","","Peter Tester","","peter.test@email.test","","Yes","03/04/2024","10:30:00 AM","03/04/2024","10:00:00 AM","00:30:00","0.50","0.00","0.00"
+        CSV;
+
+        // Act
+        try {
+            $importer->importData($data, $timezone);
+        } catch (ImportException $e) {
+            // Assert
+            $this->assertSame('End ("03/04/2024 10:00:00 AM") is before start ("03/04/2024 10:30:00 AM")', $e->getMessage());
+            $this->assertSame(0, TimeEntry::query()->count());
+
+            return;
+        }
+        $this->fail();
+    }
+
+    public function test_import_drops_billable_flags_and_rates_if_organization_can_not_use_billable_rates(): void
+    {
+        // Arrange
+        $this->actAsOrganizationWithoutBillableRates();
+        $organization = Organization::factory()->create();
+        $timezone = 'Europe/Vienna';
+        $importer = new ClockifyTimeEntriesImporter;
+        $importer->init($organization);
+        $data = Storage::disk('testfiles')->get('clockify_time_entries_import_test_1.csv');
+
+        // Act
+        $importer->importData($data, $timezone);
+
+        // Assert
+        $timeEntries = TimeEntry::query()->whereBelongsTo($organization, 'organization')->get();
+        $this->assertCount(2, $timeEntries);
+        foreach ($timeEntries as $timeEntry) {
+            $this->assertFalse($timeEntry->billable);
+            $this->assertNull($timeEntry->billable_rate);
+        }
+    }
 }

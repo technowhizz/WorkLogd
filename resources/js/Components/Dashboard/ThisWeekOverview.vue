@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import UpgradeLockedValue from '@/packages/ui/src/UpgradeLockedValue.vue';
+import { useBillableRatesLock } from '@/packages/ui/src/utils/useBillableRatesLock';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { BarChart } from 'echarts/charts';
@@ -103,6 +105,8 @@ const { data: totalWeeklyBillableTime } = useQuery({
     staleTime: 1000 * 30, // 30 seconds
 });
 
+const { locked: billableRatesLocked } = useBillableRatesLock();
+
 const { data: totalWeeklyBillableAmount } = useQuery({
     queryKey: ['totalWeeklyBillableAmount', organizationId],
     queryFn: () => {
@@ -112,7 +116,7 @@ const { data: totalWeeklyBillableAmount } = useQuery({
             },
         });
     },
-    enabled: computed(() => !!organizationId.value),
+    enabled: computed(() => !!organizationId.value && !billableRatesLocked.value),
     staleTime: 1000 * 30, // 30 seconds
 });
 
@@ -295,7 +299,11 @@ const option = computed(() => {
                           )
                         : '--'
                 " />
+            <StatCard v-if="billableRatesLocked" title="Billable Amount">
+                <UpgradeLockedValue />
+            </StatCard>
             <StatCard
+                v-else
                 title="Billable Amount"
                 :value="
                     totalWeeklyBillableAmount

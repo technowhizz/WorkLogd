@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
-use App\Enums\Weekday;
 use App\Service\Dto\UserAgentDto;
-use App\Service\TimezoneService;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Carbon;
@@ -16,6 +14,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Laravel\Fortify\Actions\DisableTwoFactorAuthentication;
 use Laravel\Fortify\Features;
+use stdClass;
 
 class UserProfileController extends Controller
 {
@@ -93,8 +92,6 @@ class UserProfileController extends Controller
         $this->validateTwoFactorAuthenticationState($request);
 
         return Inertia::render('Profile/Show', [
-            'timezones' => app(TimezoneService::class)->getSelectOptions(),
-            'weekdays' => Weekday::toSelectArray(),
             'confirmsTwoFactorAuthentication' => Features::optionEnabled(Features::twoFactorAuthentication(), 'confirm'),
             'sessions' => $this->sessions($request),
         ]);
@@ -103,7 +100,7 @@ class UserProfileController extends Controller
     /**
      * Get the current sessions.
      *
-     * @return array<int, object{agent: array{is_desktop: bool, platform: string|null, browser: string|null}, ip_address: string, is_current_device: bool, last_active: string}&\stdClass>
+     * @return array<int, object{agent: array{is_desktop: bool, platform: string|null, browser: string|null}, ip_address: string, is_current_device: bool, last_active: string}&stdClass>
      */
     public function sessions(Request $request): array
     {

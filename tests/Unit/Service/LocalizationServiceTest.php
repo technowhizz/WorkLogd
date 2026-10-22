@@ -8,6 +8,7 @@ use App\Enums\CurrencyFormat;
 use App\Enums\DateFormat;
 use App\Enums\IntervalFormat;
 use App\Enums\NumberFormat;
+use App\Enums\TimeEntryAggregationType;
 use App\Enums\TimeFormat;
 use App\Service\LocalizationService;
 use Brick\Money\Currency;
@@ -186,7 +187,7 @@ class LocalizationServiceTest extends TestCaseWithDatabase
         // Arrange
         $this->localizationService->setCurrencyFormat(CurrencyFormat::SymbolAfterWithSpace);
         $this->localizationService->setNumberFormat(NumberFormat::ThousandsSpaceDecimalComma);
-        $money = Money::of(1234567.89, Currency::of('EUR'));
+        $money = Money::of('1234567.89', Currency::of('EUR'));
 
         // Act
         $formatted = $this->localizationService->formatCurrency($money);
@@ -200,7 +201,7 @@ class LocalizationServiceTest extends TestCaseWithDatabase
         // Arrange
         $this->localizationService->setCurrencyFormat(CurrencyFormat::SymbolBeforeWithSpace);
         $this->localizationService->setNumberFormat(NumberFormat::ThousandsSpaceDecimalComma);
-        $money = Money::of(1234567.89, Currency::of('EUR'));
+        $money = Money::of('1234567.89', Currency::of('EUR'));
 
         // Act
         $formatted = $this->localizationService->formatCurrency($money);
@@ -214,7 +215,7 @@ class LocalizationServiceTest extends TestCaseWithDatabase
         // Arrange
         $this->localizationService->setCurrencyFormat(CurrencyFormat::SymbolBefore);
         $this->localizationService->setNumberFormat(NumberFormat::ThousandsSpaceDecimalComma);
-        $money = Money::of(1234567.89, Currency::of('EUR'));
+        $money = Money::of('1234567.89', Currency::of('EUR'));
 
         // Act
         $formatted = $this->localizationService->formatCurrency($money);
@@ -228,7 +229,7 @@ class LocalizationServiceTest extends TestCaseWithDatabase
         // Arrange
         $this->localizationService->setCurrencyFormat(CurrencyFormat::SymbolAfter);
         $this->localizationService->setNumberFormat(NumberFormat::ThousandsSpaceDecimalComma);
-        $money = Money::of(1234567.89, Currency::of('EUR'));
+        $money = Money::of('1234567.89', Currency::of('EUR'));
 
         // Act
         $formatted = $this->localizationService->formatCurrency($money);
@@ -242,7 +243,7 @@ class LocalizationServiceTest extends TestCaseWithDatabase
         // Arrange
         $this->localizationService->setCurrencyFormat(CurrencyFormat::ISOCodeAfterWithSpace);
         $this->localizationService->setNumberFormat(NumberFormat::ThousandsSpaceDecimalComma);
-        $money = Money::of(1234567.89, Currency::of('EUR'));
+        $money = Money::of('1234567.89', Currency::of('EUR'));
 
         // Act
         $formatted = $this->localizationService->formatCurrency($money);
@@ -256,7 +257,7 @@ class LocalizationServiceTest extends TestCaseWithDatabase
         // Arrange
         $this->localizationService->setCurrencyFormat(CurrencyFormat::ISOCodeBeforeWithSpace);
         $this->localizationService->setNumberFormat(NumberFormat::ThousandsSpaceDecimalComma);
-        $money = Money::of(1234567.89, Currency::of('EUR'));
+        $money = Money::of('1234567.89', Currency::of('EUR'));
 
         // Act
         $formatted = $this->localizationService->formatCurrency($money);
@@ -302,5 +303,88 @@ class LocalizationServiceTest extends TestCaseWithDatabase
 
         // Assert
         $this->assertSame('14:09', $formatted);
+    }
+
+    public function test_format_time_group_key_formats_a_day_key_with_the_date_format(): void
+    {
+        // Arrange
+        $this->localizationService->setDateFormat(DateFormat::SlashSeparatedDDMMYYYY);
+
+        // Act
+        $formatted = $this->localizationService->formatTimeGroupKey('2001-02-03', TimeEntryAggregationType::Day);
+
+        // Assert
+        $this->assertSame('03/02/2001', $formatted);
+    }
+
+    public function test_format_time_group_key_returns_null_for_a_null_key(): void
+    {
+        // Act
+        $formatted = $this->localizationService->formatTimeGroupKey(null, TimeEntryAggregationType::Day);
+
+        // Assert
+        $this->assertNull($formatted);
+    }
+
+    public function test_format_time_group_key_formats_a_week_key_as_the_range_it_covers(): void
+    {
+        // Arrange
+        $this->localizationService->setDateFormat(DateFormat::SlashSeparatedDDMMYYYY);
+
+        // Act
+        $formatted = $this->localizationService->formatTimeGroupKey('2026-07-27', TimeEntryAggregationType::Week);
+
+        // Assert
+        $this->assertSame('27/07/2026 - 02/08/2026', $formatted);
+    }
+
+    public function test_format_time_group_key_formats_a_week_range_from_the_weekday_of_its_own_key(): void
+    {
+        // Arrange
+        $this->localizationService->setDateFormat(DateFormat::SlashSeparatedDDMMYYYY);
+
+        // Act
+        $sundayStart = $this->localizationService->formatTimeGroupKey('2026-07-26', TimeEntryAggregationType::Week);
+        $mondayStart = $this->localizationService->formatTimeGroupKey('2026-07-20', TimeEntryAggregationType::Week);
+
+        // Assert
+        $this->assertSame('26/07/2026 - 01/08/2026', $sundayStart);
+        $this->assertSame('20/07/2026 - 26/07/2026', $mondayStart);
+    }
+
+    public function test_format_time_group_key_formats_a_week_range_spanning_new_year(): void
+    {
+        // Arrange
+        $this->localizationService->setDateFormat(DateFormat::SlashSeparatedDDMMYYYY);
+
+        // Act
+        $formatted = $this->localizationService->formatTimeGroupKey('2025-12-29', TimeEntryAggregationType::Week);
+
+        // Assert
+        $this->assertSame('29/12/2025 - 04/01/2026', $formatted);
+    }
+
+    public function test_format_time_group_key_formats_a_month_key_and_does_not_change_year_and_entity_group_types(): void
+    {
+        // Arrange
+        $this->localizationService->setDateFormat(DateFormat::SlashSeparatedDDMMYYYY);
+
+        // Act & Assert
+        $this->assertSame('February 2001', $this->localizationService->formatTimeGroupKey('2001-02', TimeEntryAggregationType::Month));
+        $this->assertSame('2001', $this->localizationService->formatTimeGroupKey('2001', TimeEntryAggregationType::Year));
+        $this->assertSame('some-uuid', $this->localizationService->formatTimeGroupKey('some-uuid', TimeEntryAggregationType::Project));
+    }
+
+    public function test_format_time_group_key_formats_a_month_key_independently_of_the_current_day_of_month(): void
+    {
+        // Arrange
+        // Note: the current day of the month must not leak into the parsed month. The 31st does
+        // not exist in April, so a leaked day overflows the date into the following month.
+        $this->travelTo(Carbon::create(2026, 8, 31, 12, 0, 0, 'UTC'));
+
+        // Act & Assert
+        $this->assertSame('February 2001', $this->localizationService->formatTimeGroupKey('2001-02', TimeEntryAggregationType::Month));
+        $this->assertSame('April 2026', $this->localizationService->formatTimeGroupKey('2026-04', TimeEntryAggregationType::Month));
+        $this->assertSame('December 2026', $this->localizationService->formatTimeGroupKey('2026-12', TimeEntryAggregationType::Month));
     }
 }

@@ -1,16 +1,28 @@
 # Contributing to solidtime
 
-Contributions are greatly apprecited, please make sure to read the rules and vision for solidtime before contributing. 
+Contributions are greatly apprecited, please make sure to read the rules and vision for solidtime before contributing.
 
 ## Rules
 
 ### Issues for Bugs, Discussions for Feature requests
 
-In order to keep the issues of the repository clean we decided to only use them for bugs. Feature Requests and enhancement are handled in discussions. This also helps us to see which feature requests are popular as they can be upvoted. 
+In order to keep the issues of the repository clean we decided to only use them for bugs. Feature Requests and enhancements are handled in discussions. This also helps us to see which feature requests are popular as they can be upvoted.
+
+### Do not use AI-generated text in issues, discussions and PR descriptions
+
+We are human, so please write in natural language in your issues, discussions, and PR descriptions.
+Don't be a meatproxy. We will ban people who repeatedly violate this rule from further communication on our repositories.
+
+### Before you contribute, ask yourself what value you add
+
+We much prefer reading your thoughts on features or issues you encountered than reading through hundreds of lines of code changes produced by your agent.
+Consider that the maintainers of this project have the same access to LLMs and more knowledge about the project itself.
+Prompting a feature into existence without further consideration or discussion is mostly a burden for maintainers.
+If we want to, we can burn the tokens ourselves.
 
 ### Only work on approved issues
 
-To respect your time and help us manage contributions effectively, please open an issue or start a discussion and wait for approval before submitting a pull request (PR). This does not apply to tiny fixes or changes however, please keep in mind that we might not merge PRs for various reasons. 
+To respect your time and help us manage contributions effectively, please open an issue or start a discussion and wait for approval before submitting a pull request (PR). This does not apply to tiny fixes or changes however, please keep in mind that we might not merge PRs for various reasons.
 
 ### Vouched contributors
 
@@ -26,45 +38,45 @@ To get vouched, open an issue or discussion before you start and explain how you
 
 Being vouched only stops your pull requests from being closed automatically. [Only work on approved issues](#only-work-on-approved-issues) still applies to every pull request you send.
 
-Contributors who abuse this are denounced, and their pull requests are closed regardless of size. 
+Contributors who abuse this are denounced, and their pull requests are closed regardless of size.
 
 ### Contributor License Agreement
 
 You'll also notice that we’ve set up a [Contributor License Agreement (CLA)](https://cla-assistant.io/solidtime-io/solidtime), which must be signed before any PR can be merged. Don’t worry - the process is quick and only takes a few clicks.
 
-We want to be transparent about why we require the CLA and what it means for your contributions and the codebase. That’s why we’ve written a few paragraphs below outlining our plans and vision for solidtime in the **Vision** part of this document. 
+We want to be transparent about why we require the CLA and what it means for your contributions and the codebase. That’s why we’ve written a few paragraphs below outlining our plans and vision for solidtime in the **Vision** part of this document.
 
 ### Prevent Duplicate Work
 
-Before you submit a new PR, make sure that none exists already. If you plan to work on an issue, make sure to let us and others know by commenting on the issue/discussion. 
+Before you submit a new PR, make sure that none exists already. If you plan to work on an issue, make sure to let us and others know by commenting on the issue/discussion.
 
 ### Give context
 
-Tell us what you thinking was behind the decisions you made while drafting the PR. Treat the PR itself as documentation for everyone who wants to go back and understand why certain decisions were made. 
+Tell us what you thinking was behind the decisions you made while drafting the PR. Treat the PR itself as documentation for everyone who wants to go back and understand why certain decisions were made.
 
 ### Summarize your PR
 
-Please make sure to include a short summary at the top of your PR to make it easy for us to quickly check what the PR is about, without looking at the code changes. 
+Please make sure to include a short summary at the top of your PR to make it easy for us to quickly check what the PR is about, without looking at the code changes.
 
 ### Use Github Keywords and Auto-Link Issues
 
-Use phrases like "Closes #123" or "Fixes #123" in the PR description to link the PR with the issue that you are adressing. 
+Use phrases like "Closes #123" or "Fixes #123" in the PR description to link the PR with the issue that you are adressing.
 
 ### Mention what you tested and how
 
-Explain how you tested and validated the implementation. 
+Explain how you tested and validated the implementation.
 
 ### Keep Naming consistent
 
-Look at existing code patterns and use naming conventions that already exist in the code base. 
+Look at existing code patterns and use naming conventions that already exist in the code base.
 
 ### Testing
 
-We have an exhaustive test-suite of PHPUnit (Backend) and Playwright (Frontend) testing. Whereever applicable please make sure to write add tests to the codebase. 
+We have an exhaustive test-suite of PHPUnit (Backend) and Playwright (Frontend) testing. Whereever applicable please make sure to write add tests to the codebase.
 
 ### Linting & Formatting
 
-Make sure to run linting and formatting commands before you commit the changes. 
+Make sure to run linting and formatting commands before you commit the changes.
 
 For backend changes:
 
@@ -73,7 +85,7 @@ composer fix
 composer analyse
 ```
 
-For frontend changes: 
+For frontend changes:
 
 ```
 npm run lint:fix
@@ -94,4 +106,4 @@ Finally - and perhaps most importantly - we offer a hosted SaaS version called s
 
 Having full control over the source code’s licensing also gives us the ability to change the license of the main project in the future. That said, we have no plans to do so and would only consider it in extreme cases - for example, if a malicious actor were to directly compete with our hosted service in a way that threatens the sustainability of the project, the legal interpretation of AGPL changes in a way that would make it unreasonable to use for certain companies, or a new similar license gains wide-spread adoption. Regardless, solidtime will always remain free to self-host for individuals and companies who use it as part of their work, and all previous releases will remain licensed under AGPL.
 
-If you are using the open-source version of solidtime and want to support us, the best way to do so is to spread the word. 
+If you are using the open-source version of solidtime and want to support us, the best way to do so is to spread the word.

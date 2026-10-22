@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Enums\RegistrationMode;
 use App\Service\InvitationService;
 use Closure;
 use Illuminate\Http\Request;
@@ -41,7 +42,7 @@ class EnsureRegistrationIsEnabled
             return $next($request);
         }
 
-        if (config('app.enable_registration')) {
+        if (RegistrationMode::fromConfig(config('app.enable_registration')) !== RegistrationMode::Off) {
             return $next($request);
         }
 

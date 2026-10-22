@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import UpgradeLockedValue from '@/packages/ui/src/UpgradeLockedValue.vue';
+import { useBillableRatesLock } from '@/packages/ui/src/utils/useBillableRatesLock';
 import ReportingRow from '@/Components/Common/Reporting/ReportingRow.vue';
 import ReportingGroupBySelect from '@/Components/Common/Reporting/ReportingGroupBySelect.vue';
 import {
@@ -95,20 +97,24 @@ const tableData = computed(() => {
     return (
         aggregatedTableTimeEntries.value?.grouped_data?.map((entry) => {
             return {
+                key: entry.key,
                 seconds: entry.seconds,
                 cost: entry.cost,
                 description: getNameForReportingRowEntry(
                     entry.key,
-                    aggregatedTableTimeEntries.value?.grouped_type ?? null
+                    aggregatedTableTimeEntries.value?.grouped_type ?? null,
+                    organization?.value?.date_format
                 ),
                 grouped_data:
                     entry.grouped_data?.map((el) => {
                         return {
+                            key: el.key,
                             seconds: el.seconds,
                             cost: el.cost,
                             description: getNameForReportingRowEntry(
                                 el.key,
-                                entry.grouped_type ?? null
+                                entry.grouped_type ?? null,
+                                organization?.value?.date_format
                             ),
                         };
                     }) ?? [],
@@ -122,6 +128,8 @@ const showBillableRate = computed(() => {
         getCurrentRole() !== 'employee' || organization?.value?.employees_can_see_billable_rates
     );
 });
+
+const { locked: billableRatesLocked } = useBillableRatesLock();
 </script>
 
 <template>
@@ -164,7 +172,7 @@ const showBillableRate = computed(() => {
                 ">
                 <ReportingRow
                     v-for="entry in tableData"
-                    :key="entry.description ?? 'none'"
+                    :key="entry.key ?? 'none'"
                     :currency="getOrganizationCurrencyString()"
                     :show-cost="showBillableRate"
                     :entry="entry"></ReportingRow>
@@ -186,17 +194,20 @@ const showBillableRate = computed(() => {
                     <div
                         v-if="showBillableRate"
                         class="justify-end pr-6 flex items-center font-medium">
-                        {{
-                            aggregatedTableTimeEntries.cost
-                                ? formatCents(
-                                      aggregatedTableTimeEntries.cost,
-                                      getOrganizationCurrencyString(),
-                                      organization?.currency_format,
-                                      organization?.currency_symbol,
-                                      organization?.number_format
-                                  )
-                                : '--'
-                        }}
+                        <UpgradeLockedValue v-if="billableRatesLocked" />
+                        <template v-else>
+                            {{
+                                aggregatedTableTimeEntries.cost
+                                    ? formatCents(
+                                          aggregatedTableTimeEntries.cost,
+                                          getOrganizationCurrencyString(),
+                                          organization?.currency_format,
+                                          organization?.currency_symbol,
+                                          organization?.number_format
+                                      )
+                                    : '--'
+                            }}
+                        </template>
                     </div>
                 </div>
             </template>

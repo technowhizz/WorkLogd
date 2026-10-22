@@ -20,7 +20,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Billable;
@@ -112,10 +111,20 @@ class Organization extends Model implements AuditableContract
     protected $attributes = [
     ];
 
+    public function getAuditOwnerOrganizationId(): ?string
+    {
+        return $this->getKey();
+    }
+
+    protected function isAuditOwnerOfItself(): bool
+    {
+        return true;
+    }
+
     /**
      * Get all the users that belong to the team.
      *
-     * @return BelongsToMany<User, $this, Pivot, 'membership'>
+     * @return BelongsToMany<User, $this, Member, 'membership'>
      */
     public function users(): BelongsToMany
     {
@@ -148,7 +157,7 @@ class Organization extends Model implements AuditableContract
     }
 
     /**
-     * @return BelongsToMany<User, $this, Pivot, 'membership'>
+     * @return BelongsToMany<User, $this, Member, 'membership'>
      */
     public function realUsers(): BelongsToMany
     {

@@ -27,6 +27,7 @@ class ImportRequest extends BaseFormRequest
             'data' => [
                 'required',
                 'string',
+                'max:'.config('import.max_data_size'),
             ],
             // Assign all imported time entries to this member instead of taking the owner from the import file
             'member_id' => [

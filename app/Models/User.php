@@ -19,7 +19,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -37,7 +36,10 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property string|null $pending_email
  * @property Carbon|null $email_verified_at
  * @property string|null $password
+ * @property string|null $remember_token
  * @property string|null $two_factor_secret
+ * @property string|null $two_factor_recovery_codes
+ * @property Carbon|null $two_factor_confirmed_at
  * @property string $timezone
  * @property bool $is_placeholder
  * @property bool $is_admin
@@ -45,6 +47,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property int $calendar_week_days
  * @property string $no_project_color
  * @property bool $show_missing_ticket_hints
+ * @property bool $send_time_entry_still_running_email
  * @property string|null $profile_photo_path
  * @property-read Organization|null $currentOrganization
  * @property-read GoogleCalendarConnection|null $googleCalendarConnection
@@ -117,6 +120,7 @@ class User extends Authenticatable implements AuditableContract, MustVerifyEmail
         'calendar_week_days' => 'integer',
         'no_project_color' => 'string',
         'show_missing_ticket_hints' => 'boolean',
+        'send_time_entry_still_running_email' => 'boolean',
     ];
 
     /**
@@ -133,7 +137,18 @@ class User extends Authenticatable implements AuditableContract, MustVerifyEmail
         'calendar_week_days' => 7,
         'no_project_color' => '#6b7280',
         'show_missing_ticket_hints' => false,
+        'send_time_entry_still_running_email' => true,
     ];
+
+    public function getAuditOwnerUserId(): ?string
+    {
+        return $this->getKey();
+    }
+
+    protected function isAuditOwnerOfItself(): bool
+    {
+        return true;
+    }
 
     /**
      * Get the URL to the user's profile photo.
@@ -166,7 +181,7 @@ class User extends Authenticatable implements AuditableContract, MustVerifyEmail
      */
     public function isSuperAdmin(): bool
     {
-        return $this->is_admin || $this->isSuperAdminByConfiguration();
+        return ! $this->is_placeholder && ($this->is_admin || $this->isSuperAdminByConfiguration());
     }
 
     /**
@@ -197,7 +212,7 @@ class User extends Authenticatable implements AuditableContract, MustVerifyEmail
     }
 
     /**
-     * @return BelongsToMany<Organization, $this, Pivot, 'membership'>
+     * @return BelongsToMany<Organization, $this, Member, 'membership'>
      */
     public function organizations(): BelongsToMany
     {
@@ -212,7 +227,7 @@ class User extends Authenticatable implements AuditableContract, MustVerifyEmail
     }
 
     /**
-     * @return BelongsToMany<Organization, $this, Pivot, 'membership'>
+     * @return BelongsToMany<Organization, $this, Member, 'membership'>
      */
     public function ownedOrganizations(): BelongsToMany
     {

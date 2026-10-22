@@ -45,6 +45,7 @@ class UserEndpointTest extends ApiEndpointTestAbstract
                 'profile_photo_url' => $data->user->profile_photo_url,
                 'timezone' => $data->user->timezone,
                 'week_start' => $data->user->week_start->value,
+                'send_time_entry_still_running_email' => true,
                 'calendar_week_days' => $data->user->calendar_week_days,
                 'no_project_color' => $data->user->no_project_color,
                 'show_missing_ticket_hints' => $data->user->show_missing_ticket_hints,
@@ -134,7 +135,7 @@ class UserEndpointTest extends ApiEndpointTestAbstract
         $response->assertJsonValidationErrors('organization_id');
     }
 
-    public function test_update_changes_user_name_timezone_and_week_start(): void
+    public function test_update_changes_user_profile_settings(): void
     {
         // Arrange
         $data = $this->createUserWithPermission();
@@ -145,8 +146,7 @@ class UserEndpointTest extends ApiEndpointTestAbstract
             'name' => 'Updated Name',
             'timezone' => 'America/New_York',
             'week_start' => Weekday::Sunday->value,
-            'calendar_week_days' => 5,
-            'no_project_color' => '#ff7043',
+            'send_time_entry_still_running_email' => false,
         ]);
 
         // Assert
@@ -157,8 +157,7 @@ class UserEndpointTest extends ApiEndpointTestAbstract
                 'name' => 'Updated Name',
                 'timezone' => 'America/New_York',
                 'week_start' => Weekday::Sunday->value,
-                'calendar_week_days' => 5,
-                'no_project_color' => '#ff7043',
+                'send_time_entry_still_running_email' => false,
             ],
         ]);
 
@@ -166,127 +165,7 @@ class UserEndpointTest extends ApiEndpointTestAbstract
         $this->assertSame('Updated Name', $user->name);
         $this->assertSame('America/New_York', $user->timezone);
         $this->assertSame(Weekday::Sunday, $user->week_start);
-        $this->assertSame(5, $user->calendar_week_days);
-        $this->assertSame('#ff7043', $user->no_project_color);
-    }
-
-    public function test_update_changes_show_missing_ticket_hints(): void
-    {
-        // Arrange
-        $data = $this->createUserWithPermission();
-        Passport::actingAs($data->user);
-
-        // Act
-        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
-            'show_missing_ticket_hints' => true,
-        ]);
-
-        // Assert
-        $response->assertSuccessful();
-        $response->assertJson([
-            'data' => [
-                'show_missing_ticket_hints' => true,
-            ],
-        ]);
-        $this->assertTrue($data->user->fresh()->show_missing_ticket_hints);
-    }
-
-    public function test_update_switches_show_missing_ticket_hints_back_off(): void
-    {
-        // Arrange
-        $data = $this->createUserWithPermission();
-        $data->user->show_missing_ticket_hints = true;
-        $data->user->save();
-        Passport::actingAs($data->user);
-
-        // Act
-        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
-            'show_missing_ticket_hints' => false,
-        ]);
-
-        // Assert
-        $response->assertSuccessful();
-        $this->assertFalse($data->user->fresh()->show_missing_ticket_hints);
-    }
-
-    public function test_update_fails_if_show_missing_ticket_hints_is_not_a_boolean(): void
-    {
-        // Arrange
-        $data = $this->createUserWithPermission();
-        Passport::actingAs($data->user);
-
-        // Act
-        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
-            'show_missing_ticket_hints' => 'maybe',
-        ]);
-
-        // Assert
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors(['show_missing_ticket_hints']);
-    }
-
-    public function test_update_changes_no_project_color_to_a_color_with_alpha_channel(): void
-    {
-        // Arrange
-        $data = $this->createUserWithPermission();
-        Passport::actingAs($data->user);
-
-        // Act
-        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
-            'no_project_color' => '#ff704380',
-        ]);
-
-        // Assert
-        $response->assertSuccessful();
-        $this->assertSame('#ff704380', $data->user->fresh()->no_project_color);
-    }
-
-    public function test_update_normalizes_an_uppercase_no_project_color(): void
-    {
-        // Arrange
-        $data = $this->createUserWithPermission();
-        Passport::actingAs($data->user);
-
-        // Act
-        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
-            'no_project_color' => '#FF7043',
-        ]);
-
-        // Assert
-        $response->assertSuccessful();
-        $this->assertSame('#ff7043', $data->user->fresh()->no_project_color);
-    }
-
-    public function test_update_fails_if_no_project_color_is_not_a_valid_color(): void
-    {
-        // Arrange
-        $data = $this->createUserWithPermission();
-        Passport::actingAs($data->user);
-
-        // Act
-        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
-            'no_project_color' => 'red',
-        ]);
-
-        // Assert
-        $response->assertUnprocessable();
-        $response->assertJsonValidationErrors(['no_project_color']);
-    }
-
-    public function test_update_fails_if_no_project_color_is_not_a_string(): void
-    {
-        // Arrange
-        $data = $this->createUserWithPermission();
-        Passport::actingAs($data->user);
-
-        // Act
-        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
-            'no_project_color' => 123,
-        ]);
-
-        // Assert
-        $response->assertUnprocessable();
-        $response->assertJsonValidationErrors(['no_project_color']);
+        $this->assertFalse($user->send_time_entry_still_running_email);
     }
 
     public function test_update_does_not_change_user_fields_that_are_not_given(): void
@@ -296,9 +175,6 @@ class UserEndpointTest extends ApiEndpointTestAbstract
         $data->user->name = 'Original Name';
         $data->user->timezone = 'Europe/Vienna';
         $data->user->week_start = Weekday::Monday;
-        $data->user->calendar_week_days = 4;
-        $data->user->no_project_color = '#26a69a';
-        $data->user->show_missing_ticket_hints = true;
         $data->user->save();
         Passport::actingAs($data->user);
 
@@ -313,8 +189,6 @@ class UserEndpointTest extends ApiEndpointTestAbstract
                 'name' => 'Original Name',
                 'timezone' => 'Europe/Vienna',
                 'week_start' => Weekday::Monday->value,
-                'calendar_week_days' => 4,
-                'no_project_color' => '#26a69a',
             ],
         ]);
 
@@ -322,9 +196,6 @@ class UserEndpointTest extends ApiEndpointTestAbstract
         $this->assertSame('Original Name', $user->name);
         $this->assertSame('Europe/Vienna', $user->timezone);
         $this->assertSame(Weekday::Monday, $user->week_start);
-        $this->assertSame(4, $user->calendar_week_days);
-        $this->assertSame('#26a69a', $user->no_project_color);
-        $this->assertTrue($user->show_missing_ticket_hints);
     }
 
     public function test_update_email_stores_pending_email_and_sends_verification_email(): void
@@ -375,6 +246,44 @@ class UserEndpointTest extends ApiEndpointTestAbstract
         $this->assertSame('current@example.com', $user->email);
         $this->assertNull($user->pending_email);
         Mail::assertNothingSent();
+    }
+
+    public function test_update_fails_if_email_is_already_used_by_another_user(): void
+    {
+        // Arrange
+        Mail::fake();
+        $data = $this->createUserWithPermission();
+        User::factory()->create(['email' => 'taken@example.com']);
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'email' => 'taken@example.com',
+        ]);
+
+        // Assert
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['email']);
+        $this->assertNull($data->user->fresh()->pending_email);
+        Mail::assertNothingSent();
+    }
+
+    public function test_update_email_succeeds_if_email_is_only_used_by_a_placeholder_user(): void
+    {
+        // Arrange
+        Mail::fake();
+        $data = $this->createUserWithPermission();
+        User::factory()->placeholder()->create(['email' => 'placeholder@example.com']);
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'email' => 'placeholder@example.com',
+        ]);
+
+        // Assert
+        $response->assertSuccessful();
+        $this->assertSame('placeholder@example.com', $data->user->fresh()->pending_email);
     }
 
     public function test_update_fails_if_email_format_is_invalid(): void
@@ -639,7 +548,7 @@ class UserEndpointTest extends ApiEndpointTestAbstract
         $response->assertJsonValidationErrors(['week_start']);
     }
 
-    public function test_update_fails_if_calendar_week_days_is_out_of_range(): void
+    public function test_update_fails_if_send_time_entry_still_running_email_is_not_boolean(): void
     {
         // Arrange
         $data = $this->createUserWithPermission();
@@ -647,28 +556,12 @@ class UserEndpointTest extends ApiEndpointTestAbstract
 
         // Act
         $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
-            'calendar_week_days' => 8,
+            'send_time_entry_still_running_email' => 'not-a-boolean',
         ]);
 
         // Assert
         $response->assertUnprocessable();
-        $response->assertJsonValidationErrors(['calendar_week_days']);
-    }
-
-    public function test_update_fails_if_calendar_week_days_is_below_one(): void
-    {
-        // Arrange
-        $data = $this->createUserWithPermission();
-        Passport::actingAs($data->user);
-
-        // Act
-        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
-            'calendar_week_days' => 0,
-        ]);
-
-        // Assert
-        $response->assertUnprocessable();
-        $response->assertJsonValidationErrors(['calendar_week_days']);
+        $response->assertJsonValidationErrors(['send_time_entry_still_running_email']);
     }
 
     public function test_update_fails_if_photo_is_not_a_string(): void
@@ -898,5 +791,192 @@ class UserEndpointTest extends ApiEndpointTestAbstract
         // Assert
         $response->assertNoContent();
         $this->assertDatabaseMissing(User::class, ['id' => $data->user->getKey()]);
+    }
+
+    public function test_update_changes_user_name_timezone_and_week_start(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'name' => 'Updated Name',
+            'timezone' => 'America/New_York',
+            'week_start' => Weekday::Sunday->value,
+            'calendar_week_days' => 5,
+            'no_project_color' => '#ff7043',
+        ]);
+
+        // Assert
+        $response->assertSuccessful();
+        $response->assertJson([
+            'data' => [
+                'id' => $data->user->getKey(),
+                'name' => 'Updated Name',
+                'timezone' => 'America/New_York',
+                'week_start' => Weekday::Sunday->value,
+                'calendar_week_days' => 5,
+                'no_project_color' => '#ff7043',
+            ],
+        ]);
+
+        $user = $data->user->fresh();
+        $this->assertSame('Updated Name', $user->name);
+        $this->assertSame('America/New_York', $user->timezone);
+        $this->assertSame(Weekday::Sunday, $user->week_start);
+        $this->assertSame(5, $user->calendar_week_days);
+        $this->assertSame('#ff7043', $user->no_project_color);
+    }
+
+    public function test_update_changes_show_missing_ticket_hints(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'show_missing_ticket_hints' => true,
+        ]);
+
+        // Assert
+        $response->assertSuccessful();
+        $response->assertJson([
+            'data' => [
+                'show_missing_ticket_hints' => true,
+            ],
+        ]);
+        $this->assertTrue($data->user->fresh()->show_missing_ticket_hints);
+    }
+
+    public function test_update_switches_show_missing_ticket_hints_back_off(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        $data->user->show_missing_ticket_hints = true;
+        $data->user->save();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'show_missing_ticket_hints' => false,
+        ]);
+
+        // Assert
+        $response->assertSuccessful();
+        $this->assertFalse($data->user->fresh()->show_missing_ticket_hints);
+    }
+
+    public function test_update_fails_if_show_missing_ticket_hints_is_not_a_boolean(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'show_missing_ticket_hints' => 'maybe',
+        ]);
+
+        // Assert
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['show_missing_ticket_hints']);
+    }
+
+    public function test_update_changes_no_project_color_to_a_color_with_alpha_channel(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'no_project_color' => '#ff704380',
+        ]);
+
+        // Assert
+        $response->assertSuccessful();
+        $this->assertSame('#ff704380', $data->user->fresh()->no_project_color);
+    }
+
+    public function test_update_normalizes_an_uppercase_no_project_color(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'no_project_color' => '#FF7043',
+        ]);
+
+        // Assert
+        $response->assertSuccessful();
+        $this->assertSame('#ff7043', $data->user->fresh()->no_project_color);
+    }
+
+    public function test_update_fails_if_no_project_color_is_not_a_valid_color(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'no_project_color' => 'red',
+        ]);
+
+        // Assert
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['no_project_color']);
+    }
+
+    public function test_update_fails_if_no_project_color_is_not_a_string(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'no_project_color' => 123,
+        ]);
+
+        // Assert
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['no_project_color']);
+    }
+
+    public function test_update_fails_if_calendar_week_days_is_out_of_range(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'calendar_week_days' => 8,
+        ]);
+
+        // Assert
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['calendar_week_days']);
+    }
+
+    public function test_update_fails_if_calendar_week_days_is_below_one(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.users.update', $data->user->getKey()), [
+            'calendar_week_days' => 0,
+        ]);
+
+        // Assert
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['calendar_week_days']);
     }
 }

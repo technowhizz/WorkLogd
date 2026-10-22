@@ -13,7 +13,6 @@ use Illuminate\Support\Str;
 use Override;
 use Spatie\TemporaryDirectory\TemporaryDirectory;
 use ValueError;
-use ZipArchive;
 
 class TogglDataImporter extends DefaultImporter
 {
@@ -26,16 +25,10 @@ class TogglDataImporter extends DefaultImporter
         $temporaryDirectoryZip = null;
         $temporaryDirectory = null;
         try {
-            $zip = new ZipArchive;
             $temporaryDirectoryZip = TemporaryDirectory::make();
             file_put_contents($temporaryDirectoryZip->path('import.zip'), $data);
-            $res = $zip->open($temporaryDirectoryZip->path('import.zip'), ZipArchive::RDONLY);
-            if ($res !== true) {
-                throw new ImportException('Invalid ZIP, error code: '.$res);
-            }
             $temporaryDirectory = TemporaryDirectory::make();
-            $zip->extractTo($temporaryDirectory->path());
-            $zip->close();
+            app(ZipImportHelper::class)->extract($temporaryDirectoryZip->path('import.zip'), $temporaryDirectory->path());
             if (! file_exists($temporaryDirectory->path('clients.json'))) {
                 throw new ImportException('File "clients.json" missing in ZIP');
             }
@@ -160,9 +153,16 @@ class TogglDataImporter extends DefaultImporter
                 }
                 foreach ($projectMembers as $projectMember) {
                     $userId = $this->userImportHelper->getKeyByExternalIdentifier((string) $projectMember->user_id);
+                    if ($userId === null) {
+                        throw new Exception('User does not exist');
+                    }
+                    $memberId = $this->memberImportHelper->getKeyByExternalIdentifier($userId);
+                    if ($memberId === null) {
+                        throw new Exception('Member does not exist');
+                    }
                     $this->projectMemberImportHelper->getKey([
                         'project_id' => $projectId,
-                        'member_id' => $this->memberImportHelper->getKeyByExternalIdentifier($userId),
+                        'member_id' => $memberId,
                     ], [
                         'user_id' => $userId,
                         'billable_rate' => $projectMember->rate !== null ? (int) ($projectMember->rate * 100) : null,
@@ -189,6 +189,7 @@ class TogglDataImporter extends DefaultImporter
                     if ($projectId === null) {
                         throw new Exception('Project does not exist');
                     }
+                    $this->checkTaskNameLength($task->name);
                     $this->taskImportHelper->getKey([
                         'name' => $task->name,
                         'project_id' => $projectId,

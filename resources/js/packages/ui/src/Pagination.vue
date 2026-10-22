@@ -16,15 +16,9 @@ import {
     ChevronRightIcon,
     EllipsisHorizontalIcon,
 } from '@heroicons/vue/20/solid';
-import {
-    buttonVariants,
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/packages/ui/src';
-import { cn } from '@/lib/utils';
+import { buttonVariants } from './Buttons/index';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
+import { cn } from './utils/cn';
 import { computed, watch } from 'vue';
 
 const page = defineModel<number>('page', { default: 1 });

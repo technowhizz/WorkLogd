@@ -54,3 +54,11 @@ _ide_helper.php
 
 storage/logs/*
 storage/*.key
+
+.config
+.data
+
+# Runtime/test data and generated credentials are never image inputs.
+storage
+bootstrap/cache/*.php
+public/storage

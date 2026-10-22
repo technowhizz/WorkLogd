@@ -10,6 +10,8 @@ use App\Service\Jira\JiraOAuthService;
 use Illuminate\Http\Request;
 
 /**
+ * @mixin JiraConnection
+ *
  * @property-read JiraConnection|null $resource
  */
 class JiraConnectionResource extends BaseResource
@@ -35,11 +37,11 @@ class JiraConnectionResource extends BaseResource
             : app(JiraOAuthService::class)->identity($this->resource);
 
         return [
-            /** @var bool $is_configured Whether an administrator has set a Jira site URL for the organization */
+            /** Whether an administrator has set a Jira site URL for the organization */
             'is_configured' => $this->siteUrl !== null,
             /** @var string|null $site_url Jira site the organization logs work to */
             'site_url' => $this->siteUrl,
-            /** @var bool $is_connected Whether the current user has connected their Jira account */
+            /** Whether the current user has connected their Jira account */
             'is_connected' => $this->resource !== null,
             /*
              * Fetched from Atlassian when this renders rather than stored. The application keeps
@@ -54,7 +56,7 @@ class JiraConnectionResource extends BaseResource
             'display_name' => $identity['name'] ?? null,
             /** @var string|null $sync_from_date Local date (Y-m-d) before which work is treated as already logged in Jira. Null means no cutoff. */
             'sync_from_date' => $this->resource?->sync_from_date?->format('Y-m-d'),
-            /** @var bool $requires_reauthentication Whether Jira rejected the stored token and the account needs to be connected again */
+            /** Whether Jira rejected the stored token and the account needs to be connected again */
             'requires_reauthentication' => $this->resource->requires_reauthentication ?? false,
             /** @var string|null $connected_at When the Jira account was connected (ISO 8601 format, UTC timezone, example: 2024-02-26T17:17:17Z) */
             'connected_at' => $this->formatDateTime($this->resource?->created_at),

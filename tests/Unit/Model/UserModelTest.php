@@ -317,4 +317,20 @@ class UserModelTest extends ModelTestAbstract
             $authCodesRel->pluck('id')->toArray()
         );
     }
+
+    public function test_placeholder_with_admin_flag_cannot_be_a_super_admin(): void
+    {
+        // Arrange
+        Config::set('auth.super_admins', ['placeholder@example.test']);
+        $user = User::factory()->placeholder()->create([
+            'email' => 'placeholder@example.test',
+            'is_admin' => true,
+        ]);
+
+        // Act
+        $canAccess = $user->isSuperAdmin();
+
+        // Assert
+        $this->assertFalse($canAccess);
+    }
 }

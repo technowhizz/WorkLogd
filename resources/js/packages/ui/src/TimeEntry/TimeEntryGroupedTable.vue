@@ -22,7 +22,7 @@ import type { TimeEntriesGroupedByType } from '@/types/time-entries';
 import type { ExternalSyncBadges } from '@/packages/ui/src/TimeEntry/externalSyncTypes';
 
 const selectedTimeEntries = defineModel<TimeEntry[]>('selected', {
-    default: [],
+    default: () => [],
 });
 
 const props = withDefaults(
@@ -192,9 +192,9 @@ function unselectAllTimeEntries(value: TimeEntriesGroupedByType[]) {
                 @unselect-all="unselectAllTimeEntries(value)"></TimeEntryRowHeading>
             <template v-for="entry in value" :key="entry.id">
                 <TimeEntryAggregateRow
+                    v-if="'timeEntries' in entry && entry.timeEntries.length > 1"
                     :external-sync-badges="externalSyncBadges"
                     :reserve-sync-indicator="reserveSyncIndicator"
-                    v-if="'timeEntries' in entry && entry.timeEntries.length > 1"
                     :create-project
                     :can-create-project
                     :enable-estimated-time

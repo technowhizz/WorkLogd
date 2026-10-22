@@ -174,7 +174,7 @@ const slotLabelPaddingTop = computed(() => Math.min(8, Math.max(1, slotHeight.va
 const {
     activeView,
     viewDays,
-    viewTitle,
+    rangeLabel,
     emitDatesChange,
     handlePrev,
     handleNext,
@@ -711,7 +711,7 @@ function getEventDurationSeconds(dayEvent: DayEvent, dayStr: string): number {
 
         <template v-if="!loading">
             <CalendarToolbar
-                :view-title="viewTitle"
+                :range-label="rangeLabel"
                 :active-view="activeView"
                 :settings="calendarSettings"
                 :can-zoom-in="canZoomIn"

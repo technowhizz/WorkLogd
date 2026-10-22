@@ -237,6 +237,24 @@ export function formatWeek(date: string | null): string {
 }
 
 /*
+ * Returns the range covered by the week starting on the given day.
+ * @param date - first day of a week, in the format of 'YYYY-MM-DD'
+ */
+export function formatWeekRange(date: string, format?: DateFormat): string {
+    const end = getDayJsInstance()(date).add(6, 'day').format('YYYY-MM-DD');
+    return `${formatDate(date, format)} - ${formatDate(end, format)}`;
+}
+
+/*
+ * Returns the month that the given key falls in. There is no `DateFormat` variant for a
+ * month, so this is not affected by the organization date format.
+ * @param date - a month, in the format of 'YYYY-MM'
+ */
+export function formatMonth(date: string): string {
+    return getDayJsInstance()(date).format('MMMM YYYY');
+}
+
+/*
  * Returns a human readable date format.
  * @param date - date in the format of 'YYYY-MM-DD'
  */

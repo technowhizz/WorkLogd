@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import UpgradeLockedValue from '@/packages/ui/src/UpgradeLockedValue.vue';
+import { useBillableRatesLock } from '@/packages/ui/src/utils/useBillableRatesLock';
 import {
     ChartBarIcon,
     ArrowDownTrayIcon,
@@ -30,7 +32,8 @@ import {
     DropdownMenuTrigger,
 } from '@/packages/ui/src';
 import ReportCreateModal from '@/Components/Common/Report/ReportCreateModal.vue';
-import UpgradeModal from '@/Components/Common/UpgradeModal.vue';
+import UpgradeModal from '@/packages/ui/src/UpgradeModal.vue';
+import type { UpgradeFeature } from '@/packages/ui/src/UpgradeModal/useUpgradeCta';
 import { canCreateReports } from '@/utils/permissions';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { computed, type ComputedRef, inject, ref, watch } from 'vue';
@@ -60,7 +63,7 @@ const { handleApiRequestNotifications } = useNotificationsStore();
 
 const startDate = useSessionStorage<string>(
     'reporting-start-date',
-    getLocalizedDayJs(getDayJsInstance()().format()).subtract(14, 'd').format()
+    getLocalizedDayJs(getDayJsInstance()().format()).subtract(13, 'd').format()
 );
 const endDate = useSessionStorage<string>(
     'reporting-end-date',
@@ -231,10 +234,13 @@ const showExportModal = ref(false);
 const exportUrl = ref<string | null>(null);
 const showCreateReportModal = ref(false);
 const showPremiumModal = ref(false);
+// Note: The premium modal is shared by the PDF export and saving a report
+const premiumFeature = ref<UpgradeFeature>('pdf-reports');
 const exportLoading = ref(false);
 
 function triggerExport(format: ExportFormat) {
     if (format === 'pdf' && !isAllowedToPerformPremiumAction()) {
+        premiumFeature.value = 'pdf-reports';
         showPremiumModal.value = true;
         return;
     }
@@ -248,6 +254,7 @@ function onSaveReportClick() {
     if (isAllowedToPerformPremiumAction()) {
         showCreateReportModal.value = true;
     } else {
+        premiumFeature.value = 'shareable-reports';
         showPremiumModal.value = true;
     }
 }
@@ -257,7 +264,8 @@ const groupedPieChartData = computed(() => {
         aggregatedTableTimeEntries.value?.grouped_data?.map((entry) => {
             const name = getNameForReportingRowEntry(
                 entry.key,
-                aggregatedTableTimeEntries.value?.grouped_type ?? null
+                aggregatedTableTimeEntries.value?.grouped_type ?? null,
+                organization?.value?.date_format
             );
             let color = getRandomColorWithSeed(entry.key ?? 'none');
             if (
@@ -275,11 +283,7 @@ const groupedPieChartData = computed(() => {
             }
             return {
                 value: entry.seconds,
-                name:
-                    getNameForReportingRowEntry(
-                        entry.key,
-                        aggregatedTableTimeEntries.value?.grouped_type ?? null
-                    ) ?? '',
+                name: name ?? '',
                 color: color,
             };
         }) ?? []
@@ -289,23 +293,32 @@ const groupedPieChartData = computed(() => {
 const tableData = computed(() => {
     return aggregatedTableTimeEntries.value?.grouped_data?.map((entry) => {
         return {
+            key: entry.key,
             seconds: entry.seconds,
             cost: entry.cost,
             description: getNameForReportingRowEntry(
                 entry.key,
-                aggregatedTableTimeEntries.value?.grouped_type ?? null
+                aggregatedTableTimeEntries.value?.grouped_type ?? null,
+                organization?.value?.date_format
             ),
             grouped_data:
                 entry.grouped_data?.map((el) => {
                     return {
+                        key: el.key,
                         seconds: el.seconds,
                         cost: el.cost,
-                        description: getNameForReportingRowEntry(el.key, entry.grouped_type),
+                        description: getNameForReportingRowEntry(
+                            el.key,
+                            entry.grouped_type,
+                            organization?.value?.date_format
+                        ),
                     };
                 }) ?? [],
         };
     });
 });
+
+const { locked: billableRatesLocked } = useBillableRatesLock();
 </script>
 
 <template>
@@ -315,9 +328,7 @@ const tableData = computed(() => {
     <ReportCreateModal
         v-model:show="showCreateReportModal"
         :properties="reportProperties"></ReportCreateModal>
-    <UpgradeModal v-model:show="showPremiumModal">
-        This feature is only available in solidtime Professional.
-    </UpgradeModal>
+    <UpgradeModal v-model:show="showPremiumModal" :feature="premiumFeature" />
     <MainContainer
         class="h-14 sm:h-16 border-b border-default-background-separator flex flex-wrap gap-y-3 justify-between items-center">
         <div class="flex items-center space-x-3 sm:space-x-6">
@@ -444,9 +455,8 @@ const tableData = computed(() => {
                         ">
                         <ReportingRow
                             v-for="entry in tableData"
-                            :key="entry.description ?? 'none'"
+                            :key="entry.key ?? 'none'"
                             :currency="getOrganizationCurrencyString()"
-                            :type="aggregatedTableTimeEntries.grouped_type"
                             :show-cost="showBillableRate"
                             :entry="entry"></ReportingRow>
                         <div class="contents [&>*]:transition text-text-tertiary [&>*]:h-[50px]">
@@ -467,17 +477,20 @@ const tableData = computed(() => {
                             <div
                                 v-if="showBillableRate"
                                 class="justify-end pr-6 flex items-center font-medium">
-                                {{
-                                    aggregatedTableTimeEntries.cost
-                                        ? formatCents(
-                                              aggregatedTableTimeEntries.cost,
-                                              getOrganizationCurrencyString(),
-                                              organization?.currency_format,
-                                              organization?.currency_symbol,
-                                              organization?.number_format
-                                          )
-                                        : '--'
-                                }}
+                                <UpgradeLockedValue v-if="billableRatesLocked" />
+                                <template v-else>
+                                    {{
+                                        aggregatedTableTimeEntries.cost
+                                            ? formatCents(
+                                                  aggregatedTableTimeEntries.cost,
+                                                  getOrganizationCurrencyString(),
+                                                  organization?.currency_format,
+                                                  organization?.currency_symbol,
+                                                  organization?.number_format
+                                              )
+                                            : '--'
+                                    }}
+                                </template>
                             </div>
                         </div>
                     </template>

@@ -30,6 +30,11 @@ class TestEmailCommand extends Command
     public function handle(): int
     {
         $email = $this->argument('email');
+        if (! is_string($email)) {
+            $this->error('The email argument must be a string.');
+
+            return self::INVALID;
+        }
         Mail::raw('Hello World!', function (Message $message) use ($email): void {
             $message->to($email)
                 ->subject('Test Email')

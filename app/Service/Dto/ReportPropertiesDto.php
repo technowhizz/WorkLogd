@@ -16,7 +16,7 @@ use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 class ReportPropertiesDto implements Castable
 {
@@ -108,30 +108,30 @@ class ReportPropertiesDto implements Castable
             public function get(Model $model, string $key, mixed $value, array $attributes): ReportPropertiesDto
             {
                 if (! is_string($value)) {
-                    throw new \InvalidArgumentException('The given value is not a string');
+                    throw new InvalidArgumentException('The given value is not a string');
                 }
                 $data = json_decode($value, false);
                 if ($data === null) {
-                    throw new \InvalidArgumentException('The given value is not a JSON string');
+                    throw new InvalidArgumentException('The given value is not a JSON string');
                 }
                 foreach (self::REQUIRED_PROPERTIES as $property) {
                     if (! property_exists($data, $property)) {
-                        throw new \InvalidArgumentException('The given JSON string does not contain the required property "'.$property.'"');
+                        throw new InvalidArgumentException('The given JSON string does not contain the required property "'.$property.'"');
                     }
                 }
                 $dto = new ReportPropertiesDto;
                 $dto->end = $data->end !== null ? Carbon::createFromFormat('Y-m-d\TH:i:s\Z', $data->end) : null;
                 $dto->start = $data->start !== null ? Carbon::createFromFormat('Y-m-d\TH:i:s\Z', $data->start) : null;
                 $dto->active = $data->active;
-                $dto->memberIds = $data->memberIds !== null ? ReportPropertiesDto::idArrayToCollection($data->memberIds) : null;
+                $dto->setMemberIds($data->memberIds !== null ? (array) $data->memberIds : null);
                 $dto->billable = $data->billable;
-                $dto->clientIds = $data->clientIds !== null ? ReportPropertiesDto::idArrayToCollection($data->clientIds) : null;
-                $dto->projectIds = $data->projectIds !== null ? ReportPropertiesDto::idArrayToCollection($data->projectIds) : null;
-                $dto->tagIds = $data->tagIds !== null ? ReportPropertiesDto::idArrayToCollection($data->tagIds) : null;
+                $dto->setClientIds($data->clientIds !== null ? (array) $data->clientIds : null);
+                $dto->setProjectIds($data->projectIds !== null ? (array) $data->projectIds : null);
+                $dto->setTagIds($data->tagIds !== null ? (array) $data->tagIds : null);
                 $dto->tagMatchType = isset($data->tagMatchType) ? TagMatchType::from($data->tagMatchType) : null;
                 // Note: description was added later so it is possible that the value is missing in persisted reports in the DB
                 $dto->description = isset($data->description) && is_string($data->description) ? $data->description : null;
-                $dto->taskIds = $data->taskIds ? ReportPropertiesDto::idArrayToCollection($data->taskIds) : null;
+                $dto->setTaskIds($data->taskIds !== null ? (array) $data->taskIds : null);
                 $dto->group = TimeEntryAggregationType::from($data->group);
                 $dto->subGroup = TimeEntryAggregationType::from($data->subGroup);
                 $dto->historyGroup = TimeEntryAggregationTypeInterval::from($data->historyGroup);
@@ -154,7 +154,7 @@ class ReportPropertiesDto implements Castable
             public function set(Model $model, string $key, mixed $value, array $attributes): string
             {
                 if (! ($value instanceof ReportPropertiesDto)) {
-                    throw new \InvalidArgumentException('The given value is not an instance of ReportPropertiesDto');
+                    throw new InvalidArgumentException('The given value is not an instance of ReportPropertiesDto');
                 }
 
                 $data = (object) [
@@ -181,7 +181,7 @@ class ReportPropertiesDto implements Castable
 
                 $jsonString = json_encode($data);
                 if ($jsonString === false) {
-                    throw new \InvalidArgumentException('Could not encode the given data to a JSON string');
+                    throw new InvalidArgumentException('Could not encode the given data to a JSON string');
                 }
 
                 return $jsonString;
@@ -190,31 +190,11 @@ class ReportPropertiesDto implements Castable
     }
 
     /**
-     * @param  array<mixed>  $ids
-     * @return Collection<int, string>
-     */
-    public static function idArrayToCollection(array $ids): Collection
-    {
-        $collection = new Collection;
-        foreach ($ids as $id) {
-            if (! is_string($id)) {
-                throw new \InvalidArgumentException('The given ID is not a string');
-            }
-            if ($id !== TimeEntryFilter::NONE_VALUE && ! Str::isUuid($id)) {
-                throw new \InvalidArgumentException('The given ID is not a valid UUID');
-            }
-            $collection->push($id);
-        }
-
-        return $collection;
-    }
-
-    /**
      * @param  array<mixed>|null  $memberIds
      */
     public function setMemberIds(?array $memberIds): void
     {
-        $this->memberIds = $memberIds !== null ? ReportPropertiesDto::idArrayToCollection($memberIds) : null;
+        $this->memberIds = $memberIds !== null && count($memberIds) > 0 ? TimeEntryFilter::idArrayToCollection($memberIds) : null;
     }
 
     /**
@@ -222,7 +202,7 @@ class ReportPropertiesDto implements Castable
      */
     public function setClientIds(?array $clientIds): void
     {
-        $this->clientIds = $clientIds !== null ? ReportPropertiesDto::idArrayToCollection($clientIds) : null;
+        $this->clientIds = $clientIds !== null && count($clientIds) > 0 ? TimeEntryFilter::idArrayToCollection($clientIds) : null;
     }
 
     /**
@@ -230,7 +210,7 @@ class ReportPropertiesDto implements Castable
      */
     public function setProjectIds(?array $projectIds): void
     {
-        $this->projectIds = $projectIds !== null ? ReportPropertiesDto::idArrayToCollection($projectIds) : null;
+        $this->projectIds = $projectIds !== null && count($projectIds) > 0 ? TimeEntryFilter::idArrayToCollection($projectIds) : null;
     }
 
     /**
@@ -238,7 +218,7 @@ class ReportPropertiesDto implements Castable
      */
     public function setTagIds(?array $tagIds): void
     {
-        $this->tagIds = $tagIds !== null ? ReportPropertiesDto::idArrayToCollection($tagIds) : null;
+        $this->tagIds = $tagIds !== null && count($tagIds) > 0 ? TimeEntryFilter::idArrayToCollection($tagIds) : null;
     }
 
     public function setTagMatchType(?TagMatchType $tagMatchType): void
@@ -261,6 +241,6 @@ class ReportPropertiesDto implements Castable
      */
     public function setTaskIds(?array $taskIds): void
     {
-        $this->taskIds = $taskIds !== null ? ReportPropertiesDto::idArrayToCollection($taskIds) : null;
+        $this->taskIds = $taskIds !== null && count($taskIds) > 0 ? TimeEntryFilter::idArrayToCollection($taskIds) : null;
     }
 }

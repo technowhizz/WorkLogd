@@ -9,6 +9,9 @@ import OrganizationBillableRate from '@/Pages/Teams/Partials/OrganizationBillabl
 import OrganizationFormatSettings from '@/Pages/Teams/Partials/OrganizationFormatSettings.vue';
 import OrganizationTimeEntrySettings from '@/Pages/Teams/Partials/OrganizationTimeEntrySettings.vue';
 import OrganizationJiraSettings from '@/Pages/Teams/Partials/OrganizationJiraSettings.vue';
+import OrganizationTrial from '@/Pages/Teams/Partials/OrganizationTrial.vue';
+import { isBillingActivated, isInTrial } from '@/utils/billing';
+import { canManageBilling } from '@/utils/permissions';
 import { onMounted, ref } from 'vue';
 import { useOrganizationStore } from '@/utils/useOrganization';
 import { storeToRefs } from 'pinia';
@@ -55,6 +58,10 @@ onMounted(async () => {
 
                     <SectionBorder v-if="permissions.canUpdateTeam" />
                     <OrganizationJiraSettings v-if="permissions.canUpdateTeam" />
+                    <template v-if="isBillingActivated() && isInTrial() && canManageBilling()">
+                        <SectionBorder />
+                        <OrganizationTrial />
+                    </template>
 
                     <template v-if="permissions.canDeleteTeam">
                         <SectionBorder />

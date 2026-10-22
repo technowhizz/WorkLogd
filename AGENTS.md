@@ -5,7 +5,7 @@ read it before exploring, and you'll skip a lot of dead ends.
 
 ## Stack in one breath
 
-PHP **8.3.x** / Laravel 12, Inertia + Vue 3 (script setup, TS) + Tailwind **v3**. Auth is **Fortify**
+PHP **8.3.36+** / Laravel 13, Inertia + Vue 3 (script setup, TS) + Tailwind **v3**. Auth is **Fortify**
 (headless) + **Passport** (`api` guard). Postgres only — SQLite will not work, the app uses
 `jsonb`, partial unique indexes and `date_bin()`. Frontend state: **TanStack Vue Query** for server
 data, **Pinia** only where imperative create-from-anywhere is needed. npm workspaces:
@@ -14,6 +14,15 @@ data, **Pinia** only where imperative create-from-anywhere is needed. npm worksp
 `bootstrap/app.php` is the **legacy Laravel 10-style** bootstrap — providers in `config/app.php`,
 middleware in `app/Http/Kernel.php`, schedule in `app/Console/Kernel.php`. Don't look for the L11+
 slim skeleton.
+
+## Production image
+
+`docker/prod/Dockerfile` starts from the digest-pinned Solidtime v0.22.1 runtime (PHP 8.3.36 /
+FrankenPHP 1.13), then replaces the upstream application with this fork. Prepare `vendor/`,
+`public/build/`, and a production-template `.env` before building, as `build-ghcr.yml` does.
+Never copy the deployment environment file, Passport keys, or other production secrets into
+that build context. The final image removes development Composer packages and retains the
+fork's app/worker/scheduler startup modes. Session upload progress remains disabled.
 
 ## Getting a working environment
 

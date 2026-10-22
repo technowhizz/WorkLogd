@@ -14,6 +14,7 @@ use App\Exceptions\Api\ChangingRoleToPlaceholderIsNotAllowed;
 use App\Exceptions\Api\EntityStillInUseApiException;
 use App\Exceptions\Api\OnlyOwnerCanChangeOwnership;
 use App\Exceptions\Api\OrganizationNeedsAtLeastOneOwner;
+use App\Models\Goal;
 use App\Models\Member;
 use App\Models\Organization;
 use App\Models\Project;
@@ -109,6 +110,12 @@ class MemberService
             }
         }
 
+        // A goal is deleted together with the member it is for, it is not part of the "still in use" check
+        Goal::query()
+            ->whereBelongsTo($organization, 'organization')
+            ->where('member_id', '=', $member->getKey())
+            ->delete();
+
         $member->delete();
 
         if ($isPlaceholder) {
@@ -152,6 +159,13 @@ class MemberService
 
     public function assignOrganizationEntitiesToDifferentMember(Organization $organization, Member $fromMember, Member $toMember): void
     {
+        // Running time entries are deleted instead of moved, since $toMember could already have a running time entry
+        TimeEntry::query()
+            ->whereBelongsTo($organization, 'organization')
+            ->whereBelongsTo($fromMember, 'member')
+            ->whereNull('end')
+            ->delete();
+
         // Time entries
         TimeEntry::query()
             ->whereBelongsTo($organization, 'organization')
@@ -181,6 +195,30 @@ class MemberService
             ->whereBelongsToOrganization($organization)
             ->whereBelongsTo($fromMember, 'member')
             ->delete();
+
+        // Goals: the goal belongs to the person it is for, like time entries it moves along
+        Goal::query()
+            ->whereBelongsTo($organization, 'organization')
+            ->where('member_id', '=', $fromMember->getKey())
+            ->update([
+                'member_id' => $toMember->getKey(),
+            ]);
+
+        // Goal member filters: the time entries of $fromMember now belong to $toMember, so the filters follow them
+        $goalsWithMemberFilter = Goal::query()
+            ->whereBelongsTo($organization, 'organization')
+            ->whereJsonContains('filters->memberIds', $fromMember->getKey())
+            ->get();
+        foreach ($goalsWithMemberFilter as $goal) {
+            $filters = $goal->filters;
+            $memberIds = $filters->memberIds?->map(
+                fn (string $memberId): string => $memberId === $fromMember->getKey() ? $toMember->getKey() : $memberId
+            );
+            // $toMember may already be in the filter
+            $filters->setMemberIds($memberIds?->unique()->values()->all());
+            $goal->filters = $filters;
+            $goal->save();
+        }
     }
 
     /**
@@ -218,7 +256,16 @@ class MemberService
 
         $placeholderUser = $user->replicate();
         $placeholderUser->is_placeholder = true;
-        $placeholderUser->current_team_id = $member->organization_id;
+        // Reset authentication relevant properties on the placeholder user
+        $placeholderUser->password = null;
+        $placeholderUser->remember_token = null;
+        $placeholderUser->two_factor_secret = null;
+        $placeholderUser->two_factor_recovery_codes = null;
+        $placeholderUser->two_factor_confirmed_at = null;
+        $placeholderUser->email_verified_at = null;
+        $placeholderUser->pending_email = null;
+        $placeholderUser->current_team_id = null;
+        $placeholderUser->profile_photo_path = null;
         $placeholderUser->save();
 
         $member->user()->associate($placeholderUser);

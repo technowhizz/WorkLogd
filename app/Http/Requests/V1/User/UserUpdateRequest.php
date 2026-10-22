@@ -52,9 +52,10 @@ class UserUpdateRequest extends BaseFormRequest
             'email' => [
                 'email:rfc,strict',
                 'max:255',
-                UniqueEloquent::make(User::class, 'email')->ignore($this->user->id)->query(function (Builder $query) {
+                UniqueEloquent::make(User::class, 'email')->query(function (Builder $query) {
                     /** @var Builder<User> $query */
-                    return $query->where('is_placeholder', '=', false);
+                    return $query->where('is_placeholder', '=', false)
+                        ->whereKeyNot($this->user->getKey());
                 }),
             ],
             'photo' => [
@@ -76,6 +77,9 @@ class UserUpdateRequest extends BaseFormRequest
                 new ColorRule,
             ],
             'show_missing_ticket_hints' => [
+                'boolean',
+            ],
+            'send_time_entry_still_running_email' => [
                 'boolean',
             ],
         ];
@@ -114,6 +118,13 @@ class UserUpdateRequest extends BaseFormRequest
     public function getShowMissingTicketHints(): ?bool
     {
         return $this->has('show_missing_ticket_hints') ? $this->boolean('show_missing_ticket_hints') : null;
+    }
+
+    public function getSendTimeEntryStillRunningEmail(): ?bool
+    {
+        return $this->has('send_time_entry_still_running_email')
+            ? $this->boolean('send_time_entry_still_running_email')
+            : null;
     }
 
     public function hasPhotoKey(): bool

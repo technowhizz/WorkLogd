@@ -14,6 +14,7 @@ import GoogleCalendarUpgradeNotice from '@/Pages/Profile/Partials/GoogleCalendar
 import { googleCalendarRequiresUpgrade, isGoogleCalendarEnabled } from '@/utils/googleCalendar';
 import JiraForm from '@/Pages/Profile/Partials/JiraForm.vue';
 import { isJiraEnabled } from '@/utils/jira';
+import NotificationSettingsForm from '@/Pages/Profile/Partials/NotificationSettingsForm.vue';
 
 defineProps<{
     confirmsTwoFactorAuthentication: boolean;
@@ -37,6 +38,12 @@ defineProps<{
 
                 <div>
                     <ThemeForm />
+
+                    <SectionBorder />
+                </div>
+
+                <div>
+                    <NotificationSettingsForm />
 
                     <SectionBorder />
                 </div>

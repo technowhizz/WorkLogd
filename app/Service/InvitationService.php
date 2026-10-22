@@ -19,6 +19,22 @@ use Illuminate\Support\Facades\Session;
 
 class InvitationService
 {
+    public function hasAcceptedInvitationForEmail(string $email): bool
+    {
+        return OrganizationInvitation::query()
+            ->whereRaw('lower(email) = ?', [strtolower($email)])
+            ->whereNotNull('accepted_at')
+            ->exists();
+    }
+
+    public function hasPendingInvitationForEmail(string $email): bool
+    {
+        return OrganizationInvitation::query()
+            ->whereRaw('lower(email) = ?', [strtolower($email)])
+            ->whereNull('accepted_at')
+            ->exists();
+    }
+
     /**
      * Set when someone follows an invitation link without having an account yet.
      *

@@ -13,16 +13,10 @@ import {
     archiveProjectViaApi,
     updateOrganizationSettingViaApi,
 } from './utils/api';
+import { clearTableState, getSeededRowOrder } from './utils/table';
 
 async function goToProjectsOverview(page: Page) {
     await page.goto(PLAYWRIGHT_BASE_URL + '/projects');
-}
-
-// Helper to clear localStorage before tests that check persistence
-async function clearProjectTableState(page: Page) {
-    await page.evaluate(() => {
-        localStorage.removeItem('project-table-state');
-    });
 }
 
 // Create new project via modal
@@ -84,7 +78,7 @@ test('test that archiving and unarchiving projects works', async ({ page, ctx })
     await createProjectViaApi(ctx, { name: newProjectName });
 
     await goToProjectsOverview(page);
-    await clearProjectTableState(page);
+    await clearTableState(page, 'project-table-state');
     await page.reload();
     await expect(page.getByText(newProjectName)).toBeVisible({ timeout: 10000 });
 
@@ -480,7 +474,7 @@ test('test that sorting projects by all columns works', async ({ page, ctx }) =>
     });
 
     await goToProjectsOverview(page);
-    await clearProjectTableState(page);
+    await clearTableState(page, 'project-table-state');
     await page.reload();
     await expect(page.getByTestId('project_table')).toBeVisible();
     await expect(page.getByText('AAA Project')).toBeVisible();
@@ -609,7 +603,7 @@ test('test that filtering projects by status works', async ({ page, ctx }) => {
     await createProjectViaApi(ctx, { name: newProjectName });
 
     await goToProjectsOverview(page);
-    await clearProjectTableState(page);
+    await clearTableState(page, 'project-table-state');
     await page.reload();
     await expect(page.getByText(newProjectName)).toBeVisible({ timeout: 10000 });
 
@@ -640,7 +634,7 @@ test('test that filtering projects by status works', async ({ page, ctx }) => {
 
 test('test that filter state persists after page reload', async ({ page }) => {
     await goToProjectsOverview(page);
-    await clearProjectTableState(page);
+    await clearTableState(page, 'project-table-state');
     await page.reload();
 
     // Apply Active status filter
@@ -656,9 +650,96 @@ test('test that filter state persists after page reload', async ({ page }) => {
     await expect(page.getByTestId('status-filter-badge')).toBeVisible();
 });
 
+test('test that projects without a client or estimate are ordered by name at the bottom', async ({
+    page,
+    ctx,
+}) => {
+    // Seeded a second apart: created_at only has second precision and same-second rows
+    // fall back to a random UUID order. The spacing makes the API order of the clientless
+    // rows (created_at desc: ZZZ, AAA) deterministic and different from the alphabetical
+    // order the name tie-break should produce.
+    await createProjectViaApi(ctx, { name: 'AAA Tiebreak Project' });
+    await page.waitForTimeout(1100);
+    await createProjectViaApi(ctx, { name: 'ZZZ Tiebreak Project' });
+
+    const clientAardvark = await createClientViaApi(ctx, { name: 'Aardvark Co' });
+    const clientZulu = await createClientViaApi(ctx, { name: 'Zulu Co' });
+    const projectM = await createProjectViaApi(ctx, {
+        name: 'MMM Tiebreak Project',
+        client_id: clientAardvark.id,
+        estimated_time: 36000, // 10h, 1h tracked below = 10%
+    });
+    await createTimeEntryViaApi(ctx, { duration: '1h', projectId: projectM.id });
+    const projectN = await createProjectViaApi(ctx, {
+        name: 'NNN Tiebreak Project',
+        client_id: clientZulu.id,
+        estimated_time: 14400, // 4h, 2h tracked below = 50%
+    });
+    await createTimeEntryViaApi(ctx, { duration: '2h', projectId: projectN.id });
+
+    await goToProjectsOverview(page);
+    await clearTableState(page, 'project-table-state');
+    await page.reload();
+
+    const table = page.getByTestId('project_table');
+    await expect(table).toBeVisible();
+
+    const seeded = [
+        'AAA Tiebreak Project',
+        'MMM Tiebreak Project',
+        'NNN Tiebreak Project',
+        'ZZZ Tiebreak Project',
+    ];
+    const getOrder = () => getSeededRowOrder(table, seeded);
+
+    // -- Client: empty rows last in both directions, alphabetical among themselves --
+    const clientHeader = table.locator('.select-none', { hasText: 'Client' }).first();
+    await clientHeader.click();
+    await expect
+        .poll(getOrder)
+        .toEqual([
+            'MMM Tiebreak Project',
+            'NNN Tiebreak Project',
+            'AAA Tiebreak Project',
+            'ZZZ Tiebreak Project',
+        ]);
+
+    await clientHeader.click();
+    await expect
+        .poll(getOrder)
+        .toEqual([
+            'NNN Tiebreak Project',
+            'MMM Tiebreak Project',
+            'AAA Tiebreak Project',
+            'ZZZ Tiebreak Project',
+        ]);
+
+    // -- Progress: same, and the first click sorts highest first --
+    const progressHeader = table.locator('.select-none', { hasText: 'Progress' }).first();
+    await progressHeader.click();
+    await expect
+        .poll(getOrder)
+        .toEqual([
+            'NNN Tiebreak Project',
+            'MMM Tiebreak Project',
+            'AAA Tiebreak Project',
+            'ZZZ Tiebreak Project',
+        ]);
+
+    await progressHeader.click();
+    await expect
+        .poll(getOrder)
+        .toEqual([
+            'MMM Tiebreak Project',
+            'NNN Tiebreak Project',
+            'AAA Tiebreak Project',
+            'ZZZ Tiebreak Project',
+        ]);
+});
+
 test('test that sort state persists after page reload', async ({ page }) => {
     await goToProjectsOverview(page);
-    await clearProjectTableState(page);
+    await clearTableState(page, 'project-table-state');
     await page.reload();
 
     // Click on Name header twice to sort descending
@@ -1114,7 +1195,7 @@ test.describe('Projects Pagination', () => {
         );
 
         await goToProjectsOverview(page);
-        await clearProjectTableState(page);
+        await clearTableState(page, 'project-table-state');
         await page.reload();
 
         // Default sort is name asc; first 15 projects (00–14) should be on page 1.
@@ -1168,7 +1249,7 @@ test.describe('Projects Pagination', () => {
         );
 
         await goToProjectsOverview(page);
-        await clearProjectTableState(page);
+        await clearTableState(page, 'project-table-state');
         await page.reload();
 
         await expect(page.getByTestId('project_table')).toBeVisible();
@@ -1185,7 +1266,7 @@ test.describe('Projects Pagination', () => {
         );
 
         await goToProjectsOverview(page);
-        await clearProjectTableState(page);
+        await clearTableState(page, 'project-table-state');
         await page.reload();
 
         await expect(page.getByText(prefix + '00')).toBeVisible({ timeout: 10000 });
@@ -1206,4 +1287,37 @@ test.describe('Projects Pagination', () => {
         // Index 00 should now be on page 2 (last in desc order).
         await expect(page.getByText(prefix + '00')).not.toBeVisible();
     });
+});
+
+test('test that searching projects by name works', async ({ page, ctx }) => {
+    const suffix = Math.floor(1 + Math.random() * 10000);
+    const matchingProjectName = 'Searchable Project ' + suffix;
+    const otherProjectName = 'Unrelated Work ' + suffix;
+    await createProjectViaApi(ctx, { name: matchingProjectName });
+    await createProjectViaApi(ctx, { name: otherProjectName });
+
+    await goToProjectsOverview(page);
+    await clearTableState(page, 'project-table-state');
+    await page.reload();
+    await expect(page.getByText(matchingProjectName)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(otherProjectName)).toBeVisible();
+
+    const searchInput = page.getByRole('searchbox', { name: 'Search projects' });
+
+    // Searching is case insensitive and matches part of the name
+    await searchInput.fill('SEARCHABLE');
+    await expect(page.getByText(matchingProjectName)).toBeVisible();
+    await expect(page.getByText(otherProjectName)).not.toBeVisible();
+
+    // A term that matches nothing empties the table
+    await searchInput.fill('no project has this name');
+    await expect(page.getByText(matchingProjectName)).not.toBeVisible();
+    await expect(page.getByText(otherProjectName)).not.toBeVisible();
+    await expect(page.getByText('No matching projects')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Create your First Project' })).not.toBeVisible();
+
+    // Clearing the search restores both projects
+    await searchInput.fill('');
+    await expect(page.getByText(matchingProjectName)).toBeVisible();
+    await expect(page.getByText(otherProjectName)).toBeVisible();
 });

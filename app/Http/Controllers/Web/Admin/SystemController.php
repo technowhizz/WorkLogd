@@ -50,7 +50,7 @@ class SystemController extends Controller
                 'auditable_type' => $audit->auditable_type,
                 'auditable_id' => $audit->auditable_id,
                 'user_name' => $audit->user?->name,
-                'user_id' => $audit->user_id,
+                'user_id' => $audit->actor_id,
                 'url' => $audit->url,
                 'ip_address' => $audit->ip_address,
                 'old_values' => $audit->old_values,

@@ -109,8 +109,7 @@ function remove(uuid: string) {
                     class="col-span-full bg-secondary border-b border-row-separator px-4 sm:px-6 lg:px-8 3xl:px-12 py-4">
                     <pre
                         class="text-xs font-mono bg-card-background border border-card-border rounded-lg p-3 overflow-x-auto max-h-96 text-text-secondary"
-                        >{{ job.exception }}</pre
-                    >
+                        >{{ job.exception }}</pre>
                 </div>
             </template>
         </AdminTable>

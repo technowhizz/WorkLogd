@@ -11,8 +11,9 @@ import ClientCreateModal from '@/Components/Common/Client/ClientCreateModal.vue'
 import PageTitle from '@/Components/Common/PageTitle.vue';
 import { canCreateClients } from '@/utils/permissions';
 import { TabBar, TabBarItem } from '@/packages/ui/src';
-import { useStorage } from '@vueuse/core';
-import type { SortColumn, SortDirection } from '@/Components/Common/Client/ClientTable.vue';
+import type { SortColumn } from '@/Components/Common/Client/ClientTable.vue';
+import type { SortDirection } from '@/utils/useSortableTable';
+import { useTableSortState } from '@/utils/useTableSortState';
 
 const { clients } = useClientsQuery();
 
@@ -26,21 +27,14 @@ interface ClientTableState {
     perPage: number;
 }
 
-const tableState = useStorage<ClientTableState>(
+const { tableState, handleSort } = useTableSortState<SortColumn, ClientTableState>(
     'client-table-state',
     {
         sortColumn: 'name',
         sortDirection: 'asc',
         perPage: 15,
-    },
-    undefined,
-    { mergeDefaults: true }
+    }
 );
-
-function handleSort(column: SortColumn, direction: SortDirection) {
-    tableState.value.sortColumn = column;
-    tableState.value.sortDirection = direction;
-}
 
 const shownClients = computed(() => {
     return clients.value.filter((client) => {

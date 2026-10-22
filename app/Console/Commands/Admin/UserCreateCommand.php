@@ -38,7 +38,17 @@ class UserCreateCommand extends Command
     public function handle(): int
     {
         $name = $this->argument('name');
+        if (! is_string($name)) {
+            $this->error('The name argument must be a string.');
+
+            return self::INVALID;
+        }
         $email = $this->argument('email');
+        if (! is_string($email)) {
+            $this->error('The email argument must be a string.');
+
+            return self::INVALID;
+        }
         $askForPassword = (bool) $this->option('ask-for-password');
         $verifyEmail = (bool) $this->option('verify-email');
 

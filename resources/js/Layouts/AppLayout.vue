@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, usePage } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import Banner from '@/Components/Banner.vue';
 import ImpersonationBanner from '@/Components/ImpersonationBanner.vue';
 import OrganizationSwitcher from '@/Components/OrganizationSwitcher.vue';
@@ -21,7 +21,7 @@ import {
     TableCellsIcon,
     ShieldCheckIcon,
 } from '@heroicons/vue/20/solid';
-import { PanelLeft } from '@lucide/vue';
+import { PanelLeft, Target } from '@lucide/vue';
 import NavigationSidebarItem from '@/Components/NavigationSidebarItem.vue';
 import UserSettingsIcon from '@/Components/UserSettingsIcon.vue';
 import MainContainer from '@/packages/ui/src/MainContainer.vue';
@@ -33,17 +33,22 @@ import {
     canManageBilling,
     canUpdateOrganization,
     canViewClients,
+    canViewGoals,
     canViewInvoices,
     canViewMembers,
     canViewProjects,
     canViewReport,
     canViewTags,
 } from '@/utils/permissions';
-import { isBillingActivated, isInvoicingActivated } from '@/utils/billing';
+import { canUseBillableRates, isBillingActivated, isInvoicingActivated } from '@/utils/billing';
+import UpgradeModal from '@/packages/ui/src/UpgradeModal.vue';
+import { billableRatesLockKey } from '@/packages/ui/src/utils/useBillableRatesLock';
+import { upgradeCtaKey } from '@/packages/ui/src/UpgradeModal/useUpgradeCta';
 import type { User } from '@/types/models';
 import { ArrowsRightLeftIcon } from '@heroicons/vue/16/solid';
 import { fetchToken, isTokenValid } from '@/utils/session';
 import BillingBanner from '@/Components/Billing/BillingBanner.vue';
+import SidebarPlanStatus from '@/Components/Billing/SidebarPlanStatus.vue';
 import UserTimezoneMismatchModal from '@/Components/Common/User/UserTimezoneMismatchModal.vue';
 import { useTheme } from '@/utils/theme';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
@@ -138,6 +143,18 @@ provide(
         };
     })
 );
+const showBillableRatesUpgradeModal = ref(false);
+provide(billableRatesLockKey, {
+    locked: computed(() => !canUseBillableRates()),
+    requestUpgrade: () => {
+        showBillableRatesUpgradeModal.value = true;
+    },
+});
+
+provide(upgradeCtaKey, {
+    canUpgrade: computed(() => isBillingActivated() && canManageBilling()),
+    goToBilling: () => router.visit('/billing'),
+});
 
 onMounted(async () => {
     useTheme();
@@ -273,6 +290,12 @@ const page = usePage<{
                                 "
                                 :href="route('reporting')">
                             </NavigationSidebarItem>
+                            <NavigationSidebarItem
+                                v-if="canViewGoals()"
+                                title="Goals"
+                                :icon="Target"
+                                :current="route().current('goals')"
+                                :href="route('goals')"></NavigationSidebarItem>
                         </ul>
                     </nav>
 
@@ -308,7 +331,9 @@ const page = usePage<{
                                 v-if="isInvoicingActivated() && canViewInvoices()"
                                 title="Invoices"
                                 :icon="DocumentTextIcon"
-                                :current="route().current('invoices')"
+                                :current="
+                                    route().current('invoices') || route().current('invoices.*')
+                                "
                                 href="/invoices"></NavigationSidebarItem>
                         </ul>
                     </nav>
@@ -357,6 +382,7 @@ const page = usePage<{
                     </nav>
                 </div>
                 <div class="justify-self-end">
+                    <SidebarPlanStatus v-if="isBillingActivated() && canManageBilling()" />
                     <ul
                         class="border-t border-default-background-separator pt-3 gap-1 flex justify-between items-center">
                         <UserSettingsIcon></UserSettingsIcon>
@@ -436,4 +462,5 @@ const page = usePage<{
     <NotificationContainer></NotificationContainer>
     <UserTimezoneMismatchModal></UserTimezoneMismatchModal>
     <CommandPaletteProvider></CommandPaletteProvider>
+    <UpgradeModal v-model:show="showBillableRatesUpgradeModal" feature="billable-rates" />
 </template>

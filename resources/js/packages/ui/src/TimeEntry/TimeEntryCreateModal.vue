@@ -16,12 +16,14 @@ import type {
 } from '@/packages/api/src';
 import TagDropdown from '@/packages/ui/src/Tag/TagDropdown.vue';
 import BillableIcon from '@/packages/ui/src/Icons/BillableIcon.vue';
+import { useBillableRatesLock } from '@/packages/ui/src/utils/useBillableRatesLock';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '..';
 import { Button } from '@/packages/ui/src/Buttons';
 import TimeRangeFields from '@/packages/ui/src/TimeEntry/TimeRangeFields.vue';
 import type { Tag, Task } from '@/packages/api/src';
 
 const show = defineModel('show', { default: false });
+const { locked: billableRatesLocked } = useBillableRatesLock();
 const saving = ref(false);
 
 const props = defineProps<{
@@ -135,7 +137,7 @@ const billableProxy = computed({
 </script>
 
 <template>
-    <DialogModal closeable :show="show" @close="show = false">
+    <DialogModal closeable :show="show" @close="show = false" @submit="submit">
         <template #title>
             <div class="flex space-x-2">
                 <span> Create manual time entry </span>
@@ -198,7 +200,9 @@ const billableProxy = computed({
                             </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="true">Billable</SelectItem>
+                            <SelectItem value="true" :disabled="billableRatesLocked"
+                                >Billable</SelectItem
+                            >
                             <SelectItem value="false">Non Billable</SelectItem>
                         </SelectContent>
                     </Select>

@@ -31,6 +31,11 @@ class UserVerifyCommand extends Command
     public function handle(): int
     {
         $email = $this->argument('email');
+        if (! is_string($email)) {
+            $this->error('The email argument must be a string.');
+
+            return self::INVALID;
+        }
 
         $this->info('Start verifying user with email "'.$email.'"');
 

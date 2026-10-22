@@ -23,6 +23,10 @@ export type { CalendarSettings } from './FullCalendar/calendarSettings';
 export type { ActivityPeriod } from './FullCalendar/activityTypes';
 export { cn } from './utils/cn';
 export { useCssVariable } from './utils/useCssVariable';
+export { billableRatesLockKey, useBillableRatesLock } from './utils/useBillableRatesLock';
+export type { BillableRatesLock } from './utils/useBillableRatesLock';
+export { upgradeCtaKey, useUpgradeCta } from './UpgradeModal/useUpgradeCta';
+export type { UpgradeCta, UpgradeFeature } from './UpgradeModal/useUpgradeCta';
 
 import Badge from './Badge.vue';
 import Button from './Buttons/Button.vue';
@@ -35,6 +39,7 @@ import AutoGrowTextarea from './Input/AutoGrowTextarea.vue';
 import TextInput from './Input/TextInput.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 import Modal from './Modal.vue';
+import Pagination from './Pagination.vue';
 import ProjectBadge from './Project/ProjectBadge.vue';
 import TimeEntryCreateModal from './TimeEntry/TimeEntryCreateModal.vue';
 import TimeEntryEditModal from './TimeEntry/TimeEntryEditModal.vue';
@@ -60,6 +65,16 @@ import {
     CalendarNextButton,
     CalendarPrevButton,
 } from './calendar/index';
+import {
+    Combobox,
+    ComboboxAnchor,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+    ComboboxSeparator,
+    ComboboxTrigger,
+    ComboboxViewport,
+} from './combobox/index';
 import { CommandPalette } from './CommandPalette/index';
 import {
     ContextMenu,
@@ -124,6 +139,7 @@ import FullCalendarDayHeader from './FullCalendar/FullCalendarDayHeader.vue';
 import FullCalendarEventContent from './FullCalendar/FullCalendarEventContent.vue';
 import TimeEntryCalendar from './FullCalendar/TimeEntryCalendar.vue';
 import DateRangePicker from './Input/DateRangePicker.vue';
+import DateRangeNavigator from './Input/DateRangeNavigator.vue';
 import { Label } from './label/index';
 import {
     NumberField,
@@ -153,6 +169,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs/index';
 import TabBar from './TabBar/TabBar.vue';
 import TabBarItem from './TabBar/TabBarItem.vue';
 import TimezoneMismatchModal from './TimezoneMismatchModal.vue';
+import UpgradeBadge from './UpgradeBadge.vue';
+import UpgradeLockedBadge from './UpgradeLockedBadge.vue';
+import UpgradeLockedValue from './UpgradeLockedValue.vue';
+import UpgradeModal from './UpgradeModal.vue';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip/index';
 
 export {
@@ -179,6 +199,14 @@ export {
     CardTitle,
     Checkbox,
     color,
+    Combobox,
+    ComboboxAnchor,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+    ComboboxSeparator,
+    ComboboxTrigger,
+    ComboboxViewport,
     CommandPalette,
     ContextMenu,
     ContextMenuCheckboxItem,
@@ -195,6 +223,7 @@ export {
     ContextMenuSubTrigger,
     ContextMenuTrigger,
     DateRangePicker,
+    DateRangeNavigator,
     Dialog,
     DialogClose,
     DialogContent,
@@ -242,6 +271,7 @@ export {
     NumberFieldDecrement,
     NumberFieldIncrement,
     NumberFieldInput,
+    Pagination,
     Popover,
     PopoverAnchor,
     PopoverContent,
@@ -287,4 +317,8 @@ export {
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
+    UpgradeBadge,
+    UpgradeLockedBadge,
+    UpgradeLockedValue,
+    UpgradeModal,
 };

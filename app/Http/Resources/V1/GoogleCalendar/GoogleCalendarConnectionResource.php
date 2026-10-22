@@ -9,6 +9,8 @@ use App\Models\GoogleCalendarConnection;
 use Illuminate\Http\Request;
 
 /**
+ * @mixin GoogleCalendarConnection
+ *
  * @property-read GoogleCalendarConnection|null $resource
  */
 class GoogleCalendarConnectionResource extends BaseResource
@@ -24,11 +26,11 @@ class GoogleCalendarConnectionResource extends BaseResource
     public function toArray(Request $request): array
     {
         return [
-            /** @var bool $is_connected Whether a Google account is currently connected */
+            /** Whether a Google account is currently connected */
             'is_connected' => $this->resource !== null,
-            /** @var string|null $email Email address of the connected Google account */
+            /** Email address of the connected Google account */
             'email' => $this->resource?->email,
-            /** @var bool $requires_reauthentication Whether Google rejected the stored credentials and the account needs to be connected again */
+            /** Whether Google rejected the stored credentials and the account needs to be connected again */
             'requires_reauthentication' => $this->resource->requires_reauthentication ?? false,
             /** @var string|null $connected_at When the Google account was connected (ISO 8601 format, UTC timezone, example: 2024-02-26T17:17:17Z) */
             'connected_at' => $this->formatDateTime($this->resource?->created_at),

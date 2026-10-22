@@ -9,7 +9,7 @@ async function openPicker() {
         props: { start: '', end: '' },
         attachTo: document.body,
     });
-    await wrapper.get('button').trigger('click');
+    await wrapper.get('[data-testid="date_range_picker_display"]').trigger('click');
 
     return wrapper;
 }
@@ -30,7 +30,9 @@ describe('DateRangePicker', () => {
         expect(wrapper.emitted('update:end')).toHaveLength(1);
         // Closing is what emits submit, so this is also the consumers' refresh signal
         expect(wrapper.emitted('submit')).toHaveLength(1);
-        expect(wrapper.get('button').attributes('aria-expanded')).toBe('false');
+        expect(
+            wrapper.get('[data-testid="date_range_picker_display"]').attributes('aria-expanded')
+        ).toBe('false');
 
         wrapper.unmount();
     });
@@ -47,7 +49,9 @@ describe('DateRangePicker', () => {
 
         expect(wrapper.emitted('update:end')).toEqual([['']]);
         expect(wrapper.emitted('submit')).toBeUndefined();
-        expect(wrapper.get('button').attributes('aria-expanded')).toBe('true');
+        expect(
+            wrapper.get('[data-testid="date_range_picker_display"]').attributes('aria-expanded')
+        ).toBe('true');
 
         wrapper.unmount();
     });

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Button } from '..';
-import { ChevronLeft, ChevronRight, Minus, Plus } from '@lucide/vue';
+import { Minus, Plus } from '@lucide/vue';
 import { Tabs, TabsList } from '../tabs';
 import TabBarItem from '../TabBar/TabBarItem.vue';
+import DateRangeNavigator from '../Input/DateRangeNavigator.vue';
 import CalendarSettingsPopover from './CalendarSettingsPopover.vue';
 import type { CalendarSettings } from './calendarSettings';
 import { TIME_AXIS_WIDTH } from './calendarTypes';
@@ -13,7 +14,7 @@ const CONTAINER_PADDING = 8;
 const CALENDAR_BORDER = 1;
 
 defineProps<{
-    viewTitle: string;
+    rangeLabel: string;
     activeView: string;
     settings: CalendarSettings;
     canZoomIn: boolean;
@@ -33,33 +34,18 @@ const emit = defineEmits<{
 
 <template>
     <div class="flex items-center justify-between bg-default-background px-2 py-1.5">
-        <!--
-            Left: navigation, lined up with the first day column rather than the calendar's own
-            edge, so the controls start where the grid does. Driven by the axis width itself, so
-            the two cannot drift apart - the px-2 already on the container is taken off it.
-        -->
         <div
             class="flex items-center gap-2"
             :style="{
                 paddingLeft: TIME_AXIS_WIDTH - CONTAINER_PADDING + CALENDAR_BORDER + 'px',
             }">
-            <Button
-                variant="outline"
-                size="sm"
-                class="h-8 w-8 p-0"
-                aria-label="Previous"
-                @click="emit('prev')">
-                <ChevronLeft class="h-4 w-4" />
-            </Button>
-            <Button
-                variant="outline"
-                size="sm"
-                class="h-8 w-8 p-0"
-                aria-label="Next"
-                @click="emit('next')">
-                <ChevronRight class="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" @click="emit('today')"> today </Button>
+            <DateRangeNavigator
+                :label="rangeLabel"
+                trigger-test-id="calendar-title"
+                trigger-aria-label="today"
+                @previous="emit('prev')"
+                @next="emit('next')"
+                @select="emit('today')" />
 
             <!-- Vertical zoom: each step shows one hour more or less. Set apart from the paging
                  controls, since it does something else entirely. -->
@@ -88,11 +74,6 @@ const emit = defineEmits<{
                 </Button>
             </div>
         </div>
-
-        <!-- Center: Title -->
-        <span data-testid="calendar-title" class="text-base font-semibold text-foreground">{{
-            viewTitle
-        }}</span>
 
         <!-- Right: Page supplied actions + View switcher + Settings -->
         <div class="flex items-center gap-1">

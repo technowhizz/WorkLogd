@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class DashboardService
 {
@@ -101,7 +102,7 @@ class DashboardService
         $value1 = Carbon::createFromFormat('Y-m-d', $possibleDates->first(), $timeZone);
         $value2 = Carbon::createFromFormat('Y-m-d', $possibleDates->last(), $timeZone);
         if ($value2 === null || $value1 === null) {
-            throw new \RuntimeException('Provided date is not valid');
+            throw new RuntimeException('Provided date is not valid');
         }
         if ($value1->gt($value2)) {
             $last = $value1;
@@ -151,12 +152,13 @@ class DashboardService
 
         $possibleDays = $this->lastDays($days, $timezone);
 
+        // The SQL fragment contains only a timezone offset calculated as an integer.
         $query = TimeEntry::query()
-            ->select(DB::raw('DATE('.$dateWithTimeZone.') as date, round(sum(extract(epoch from (coalesce("end", now()) - start)))) as aggregate'))
+            ->select(DB::raw('DATE('.$dateWithTimeZone.') as date, round(sum(extract(epoch from (coalesce("end", now()) - start)))) as aggregate')) // @phpstan-ignore argument.type
             ->where('user_id', '=', $user->getKey())
             ->where('organization_id', '=', $organization->getKey())
             ->workTime()
-            ->groupBy(DB::raw('DATE('.$dateWithTimeZone.')'))
+            ->groupBy(DB::raw('DATE('.$dateWithTimeZone.')')) // @phpstan-ignore argument.type
             ->orderBy('date');
 
         $query = $this->constrainDateByPossibleDates($query, $possibleDays, $timezone);
@@ -193,12 +195,13 @@ class DashboardService
         }
         $possibleDays = $this->daysOfThisWeek($timezone, $user->week_start);
 
+        // The SQL fragment contains only a timezone offset calculated as an integer.
         $query = TimeEntry::query()
-            ->select(DB::raw('DATE('.$dateWithTimeZone.') as date, round(sum(extract(epoch from (coalesce("end", now()) - start)))) as aggregate'))
+            ->select(DB::raw('DATE('.$dateWithTimeZone.') as date, round(sum(extract(epoch from (coalesce("end", now()) - start)))) as aggregate')) // @phpstan-ignore argument.type
             ->where('user_id', '=', $user->getKey())
             ->where('organization_id', '=', $organization->getKey())
             ->workTime()
-            ->groupBy(DB::raw('DATE('.$dateWithTimeZone.')'))
+            ->groupBy(DB::raw('DATE('.$dateWithTimeZone.')')) // @phpstan-ignore argument.type
             ->orderBy('date');
 
         $query = $this->constrainDateByPossibleDates($query, $possibleDays, $timezone);

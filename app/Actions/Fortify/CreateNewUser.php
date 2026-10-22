@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Fortify;
 
+use App\Enums\RegistrationMode;
 use App\Enums\Weekday;
 use App\Events\NewsletterRegistered;
 use App\Models\User;
@@ -32,11 +33,12 @@ class CreateNewUser implements CreatesNewUsers
      */
     public function create(array $input): User
     {
+        $registrationMode = RegistrationMode::fromConfig(config('app.enable_registration'));
         // Registration off still lets an invited person create the account they need to accept
         // the invitation with. Checked against the invitations table rather than the session
         // flag the sign-up screen is revealed by, so holding an invitation for one email does
         // not open registration for another.
-        if (! config('app.enable_registration')) {
+        if ($registrationMode === RegistrationMode::Off) {
             $email = is_string($input['email'] ?? null) ? $input['email'] : '';
 
             if (! app(InvitationService::class)->hasInvitationFor($email)) {
@@ -46,7 +48,7 @@ class CreateNewUser implements CreatesNewUsers
             }
         }
 
-        Validator::make($input, [
+        $validated = Validator::make($input, [
             'name' => [
                 'required',
                 'string',
@@ -68,6 +70,20 @@ class CreateNewUser implements CreatesNewUsers
                 'boolean',
             ],
         ])->validate();
+
+        if ($registrationMode === RegistrationMode::InviteOnly) {
+            $invitationService = app(InvitationService::class);
+            $email = (string) $validated['email'];
+            if (! $invitationService->hasAcceptedInvitationForEmail($email)) {
+                $message = $invitationService->hasPendingInvitationForEmail($email)
+                    ? __('Please accept the organization invitation sent to your email address before registering.')
+                    : __('Registration is only available to invited users.');
+
+                throw ValidationException::withMessages([
+                    'email' => [$message],
+                ]);
+            }
+        }
 
         $timezone = null;
         if (array_key_exists('timezone', $input) && is_string($input['timezone'])) {

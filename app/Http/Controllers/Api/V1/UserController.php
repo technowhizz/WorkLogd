@@ -136,6 +136,10 @@ class UserController extends Controller
             $user->show_missing_ticket_hints = $request->getShowMissingTicketHints();
         }
 
+        if ($request->getSendTimeEntryStillRunningEmail() !== null) {
+            $user->send_time_entry_still_running_email = $request->getSendTimeEntryStillRunningEmail();
+        }
+
         $user->save();
 
         if ($emailToVerify !== null) {

@@ -9,7 +9,6 @@ use App\Exceptions\Api\UserIsAlreadyMemberOfOrganizationApiException;
 use App\Http\Requests\V1\Invitation\InvitationIndexRequest;
 use App\Http\Requests\V1\Invitation\InvitationStoreRequest;
 use App\Http\Resources\V1\Invitation\InvitationCollection;
-use App\Http\Resources\V1\Invitation\InvitationResource;
 use App\Models\Organization;
 use App\Models\OrganizationInvitation;
 use App\Service\InvitationService;
@@ -29,8 +28,6 @@ class InvitationController extends Controller
 
     /**
      * List all invitations of an organization
-     *
-     * @return InvitationCollection<InvitationResource>
      *
      * @throws AuthorizationException
      *
@@ -87,6 +84,8 @@ class InvitationController extends Controller
 
     /**
      * Remove a pending invitation
+     *
+     * This revokes the invitation: the link in the invitation email stops working. Find the invitation ID with `GET /organizations/{organization}/invitations`.
      *
      * @throws AuthorizationException
      *

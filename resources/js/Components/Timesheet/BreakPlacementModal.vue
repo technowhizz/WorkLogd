@@ -146,7 +146,10 @@ const changeSummary = computed<PlanLine[]>(() => {
             { times: range(plan.breakSlot), label: 'Break' },
             { times: range(plan.secondHalf), label: workLabel },
             ...plan.shifted.map((shift) => ({
-                times: moved(req.otherEntries.find((e) => e.id === shift.id)!, shift),
+                times: moved(
+                    req.otherEntries.find((e) => e.id === shift.id)!,
+                    shift
+                ),
                 label: props.entryLabel(shift.id),
             })),
         ];
@@ -176,7 +179,7 @@ async function submit() {
 </script>
 
 <template>
-    <DialogModal closeable :show="show" @close="emit('cancel')">
+    <DialogModal closeable :show="show" @close="emit('cancel')" @submit="submit">
         <template #title>
             <div class="flex items-center space-x-2">
                 <Coffee class="w-5 h-5 text-text-secondary" />

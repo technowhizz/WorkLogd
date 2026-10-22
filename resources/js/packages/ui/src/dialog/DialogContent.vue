@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { cn } from '../utils/cn';
+import { useDialogFocusRestore } from '../utils/useDialogFocusRestore';
 import {
     DialogContent,
     type DialogContentEmits,
@@ -20,30 +21,32 @@ const delegatedProps = computed(() => {
 });
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits);
+
+// Forwarded consumer listeners run first, so a consumer can still take over
+// by calling preventDefault() on close-auto-focus.
+const { onOpenAutoFocus, onCloseAutoFocus } = useDialogFocusRestore();
 </script>
 
 <template>
     <DialogPortal>
         <DialogOverlay
-            class="fixed inset-0 z-50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
+            class="fixed top-0 left-0 z-50 w-screen h-screen [height:100dvh] backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
             <div class="absolute inset-0 bg-default-background opacity-30" />
+            <div
+                class="absolute inset-0 overflow-y-auto overscroll-contain flex items-start justify-center px-2">
+                <DialogContent
+                    v-bind="forwarded"
+                    :class="
+                        cn(
+                            'my-3 md:my-14 xl:my-24 bg-default-background grid w-full max-w-lg border border-border-tertiary shadow-lg duration-200 rounded-lg outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+                            props.class
+                        )
+                    "
+                    @open-auto-focus="onOpenAutoFocus"
+                    @close-auto-focus="onCloseAutoFocus">
+                    <slot />
+                </DialogContent>
+            </div>
         </DialogOverlay>
-        <div
-            :class="
-                cn(
-                    'fixed top-0 left-0 z-50 pointer-events-none w-screen h-screen flex items-start px-2 pt-3 md:pt-14 xl:pt-24 justify-center overflow-auto'
-                )
-            ">
-            <DialogContent
-                v-bind="forwarded"
-                :class="
-                    cn(
-                        'pointer-events-auto bg-default-background grid w-full max-w-lg border border-border-tertiary shadow-lg duration-200 rounded-lg outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
-                        props.class
-                    )
-                ">
-                <slot />
-            </DialogContent>
-        </div>
     </DialogPortal>
 </template>

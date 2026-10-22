@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\FallbackController;
 use App\Http\Controllers\Api\V1\ApiTokenController;
 use App\Http\Controllers\Api\V1\ChartController;
 use App\Http\Controllers\Api\V1\ClientController;
 use App\Http\Controllers\Api\V1\CurrencyController;
 use App\Http\Controllers\Api\V1\ExportController;
+use App\Http\Controllers\Api\V1\GoalController;
 use App\Http\Controllers\Api\V1\GoogleCalendarController;
 use App\Http\Controllers\Api\V1\ImportController;
 use App\Http\Controllers\Api\V1\InvitationController;
@@ -25,7 +27,6 @@ use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\UserMembershipController;
 use App\Http\Controllers\Api\V1\UserTimeEntryController;
 use Illuminate\Support\Facades\Route;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /*
 |--------------------------------------------------------------------------
@@ -155,6 +156,15 @@ Route::prefix('v1')->name('v1.')->group(static function (): void {
             Route::delete('/reports/{report}', [ReportController::class, 'destroy'])->name('destroy');
         });
 
+        // Goal routes
+        Route::name('goals.')->prefix('/organizations/{organization}')->group(static function (): void {
+            Route::get('/goals', [GoalController::class, 'index'])->name('index');
+            Route::get('/goals/{goal}', [GoalController::class, 'show'])->name('show');
+            Route::post('/goals', [GoalController::class, 'store'])->name('store');
+            Route::put('/goals/{goal}', [GoalController::class, 'update'])->name('update');
+            Route::delete('/goals/{goal}', [GoalController::class, 'destroy'])->name('destroy');
+        });
+
         // Chart routes
         Route::name('charts.')->prefix('/organizations/{organization}/charts')->group(static function (): void {
             Route::get('/weekly-project-overview', [ChartController::class, 'weeklyProjectOverview'])->name('weekly-project-overview');
@@ -221,9 +231,5 @@ Route::prefix('v1')->name('v1.')->group(static function (): void {
  * Fallback routes, to prevent a rendered HTML page in /api/* routes
  * The / route is also included since the fallback is not triggered on the root route
  */
-Route::get('/', function (): void {
-    throw new NotFoundHttpException('API resource not found');
-});
-Route::fallback(function (): void {
-    throw new NotFoundHttpException('API resource not found');
-});
+Route::get('/', FallbackController::class);
+Route::fallback(FallbackController::class);

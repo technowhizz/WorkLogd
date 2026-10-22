@@ -46,6 +46,7 @@ class HandleInertiaRequests extends Middleware
     {
         $hasInvoicing = Module::has('Invoicing') && Module::isEnabled('Invoicing');
         $hasServices = Module::has('Services') && Module::isEnabled('Services');
+        $hasGoals = Module::has('Goals') && Module::isEnabled('Goals');
 
         /** @var BillingContract $billing */
         $billing = app(BillingContract::class);
@@ -84,11 +85,14 @@ class HandleInertiaRequests extends Middleware
             // Per organization rather than per installation: an admin points it at their Jira
             // site, and members of an organization without one never see the integration
             'jira_enabled' => $currentOrganization !== null && app(JiraConfig::class)->isConfigured($currentOrganization),
+            'has_goals_extension' => $hasGoals,
             'billing' => $currentOrganization !== null ? [
                 'has_subscription' => $billing->hasSubscription($currentOrganization),
                 'has_trial' => $billing->hasTrial($currentOrganization),
                 'trial_until' => $billing->getTrialUntil($currentOrganization)?->toIso8601ZuluString(),
                 'is_blocked' => $billing->isBlocked($currentOrganization),
+                'goal_limit' => $billing->getGoalLimit($currentOrganization),
+                'can_use_billable_rates' => $billing->canUseBillableRates($currentOrganization),
             ] : null,
             'flash' => [
                 'message' => fn () => $request->session()->get('message'),
