@@ -7,10 +7,12 @@ namespace Tests\Unit\Service\GoogleCalendar;
 use App\Exceptions\Api\GoogleCalendarReauthenticationRequiredApiException;
 use App\Exceptions\Api\GoogleCalendarRequestFailedApiException;
 use App\Models\GoogleCalendarConnection;
+use App\Service\GoogleCalendar\GoogleCalendarEventDto;
 use App\Service\GoogleCalendar\GoogleCalendarService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Tests\TestCaseWithDatabase;
@@ -476,6 +478,48 @@ class GoogleCalendarServiceTest extends TestCaseWithDatabase
         $this->assertCount(1, $first);
         $this->assertCount(1, $second);
         $this->assertSame('event-1', $second[0]->id);
+    }
+
+    public function test_cached_events_for_range_survives_a_cache_that_refuses_to_unserialize_objects(): void
+    {
+        // Arrange: serialize like Redis does in production, with object unserialization off,
+        // so a cached object would come back as __PHP_Incomplete_Class
+        config([
+            'cache.stores.array.serialize' => true,
+            'cache.serializable_classes' => false,
+        ]);
+        Cache::forgetDriver('array');
+        $connection = GoogleCalendarConnection::factory()->create();
+        Http::fake([
+            self::EVENTS_URL => Http::response([
+                'items' => [
+                    [
+                        'id' => 'event-1',
+                        'summary' => 'Sprint planning',
+                        'start' => ['dateTime' => '2026-08-04T10:00:00+01:00'],
+                        'end' => ['dateTime' => '2026-08-04T11:00:00+01:00'],
+                        'htmlLink' => 'https://calendar.google.com/event?eid=1',
+                    ],
+                ],
+            ], 200),
+        ]);
+        $start = CarbonImmutable::parse('2026-08-03T00:00:00Z');
+        $end = CarbonImmutable::parse('2026-08-10T00:00:00Z');
+
+        // Act: the second call is served entirely from the cache
+        $first = $this->service()->cachedEventsForRange($connection, $start, $end);
+        $second = $this->service()->cachedEventsForRange($connection, $start, $end);
+
+        // Assert
+        Http::assertSentCount(1);
+        $this->assertCount(1, $second);
+        $this->assertInstanceOf(GoogleCalendarEventDto::class, $second[0]);
+        $this->assertSame('event-1', $second[0]->id);
+        $this->assertSame('Sprint planning', $second[0]->title);
+        $this->assertTrue($second[0]->start->equalTo($first[0]->start));
+        $this->assertTrue($second[0]->end->equalTo($first[0]->end));
+        $this->assertFalse($second[0]->isAllDay);
+        $this->assertSame('https://calendar.google.com/event?eid=1', $second[0]->htmlLink);
     }
 
     public function test_cached_events_for_range_returns_an_event_spanning_midnight_once(): void

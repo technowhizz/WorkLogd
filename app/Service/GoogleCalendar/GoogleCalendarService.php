@@ -73,8 +73,8 @@ class GoogleCalendarService
         foreach ($days as $day) {
             $hit = Cache::get($this->dayCacheKey($connection, $day));
             if (is_array($hit)) {
-                /** @var list<GoogleCalendarEventDto> $hit */
-                $byDay[$day] = $hit;
+                /** @var list<array{id: string, title: string, start: string, end: string, is_all_day: bool, html_link: string|null}> $hit */
+                $byDay[$day] = array_map(GoogleCalendarEventDto::fromCacheArray(...), $hit);
             } else {
                 $missing[] = $day;
             }
@@ -92,7 +92,12 @@ class GoogleCalendarService
             foreach ($missing as $day) {
                 $dayStart = CarbonImmutable::parse($day, 'UTC');
                 $forDay = $this->eventsOverlapping($fetched, $dayStart, $dayStart->addDay());
-                Cache::put($this->dayCacheKey($connection, $day), $forDay, self::DAY_CACHE_SECONDS);
+                // Stored as plain arrays: the cache will not unserialize objects
+                Cache::put(
+                    $this->dayCacheKey($connection, $day),
+                    array_map(fn (GoogleCalendarEventDto $event): array => $event->toCacheArray(), $forDay),
+                    self::DAY_CACHE_SECONDS
+                );
                 $byDay[$day] = $forDay;
             }
         }
@@ -123,7 +128,8 @@ class GoogleCalendarService
 
     private function dayCacheKey(GoogleCalendarConnection $connection, string $day): string
     {
-        return 'google-calendar:'.$connection->id.':day:'.$day;
+        // v2: entries are plain arrays. The v1 keys held serialized DTOs and are left to expire.
+        return 'google-calendar:v2:'.$connection->id.':day:'.$day;
     }
 
     /**
