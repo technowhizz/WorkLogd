@@ -46,7 +46,11 @@ import {
 import { Coffee } from '@lucide/vue';
 import type { ActivityPeriod } from './activityTypes';
 import type { ExternalCalendarEvent } from './externalCalendarTypes';
-import { worstExternalSyncBadge, type ExternalSyncBadges } from '../TimeEntry/externalSyncTypes';
+import {
+    worstExternalSyncBadge,
+    type DaySyncStatus,
+    type ExternalSyncBadges,
+} from '../TimeEntry/externalSyncTypes';
 import { TIME_AXIS_WIDTH, type DayEvent } from './calendarTypes';
 import { DEFAULT_PIXELS_PER_HOUR } from './calendarSettings';
 import { useCalendarGrid } from './useCalendarGrid';
@@ -218,19 +222,20 @@ const {
 });
 
 /*
- * One sync state per day for the header: 'synced' when everything with a badge that day is
- * logged, 'outdated' when any entry that day is outdated (so the header matches its orange
- * dot), 'attention' when anything else is not logged, absent when the day has nothing to say -
- * no badged entries, or the page tracks no external references at all. Collapsing through
- * worstExternalSyncBadge keeps this in step with how rows and cells summarise groups.
+ * One sync state per day for the header: the state of the day's most severe entry, so the
+ * header dot is the colour of the worst dot under it - red for a missing ticket or a failed
+ * sync, orange for outdated, green when everything is logged. Pending reads as 'attention'.
+ * Absent when the day has nothing to say - no badged entries, or the page tracks no external
+ * references at all. Collapsing through worstExternalSyncBadge keeps this in step with how
+ * rows and cells summarise groups.
  */
-const dayHeaderSyncStates = computed<Record<string, 'synced' | 'outdated' | 'attention'>>(() => {
+const dayHeaderSyncStates = computed<Record<string, DaySyncStatus>>(() => {
     const badges = props.externalSyncBadges;
     if (!badges || Object.keys(badges).length === 0) {
         return {};
     }
 
-    const states: Record<string, 'synced' | 'outdated' | 'attention'> = {};
+    const states: Record<string, DaySyncStatus> = {};
     for (const day of viewDays.value) {
         const dayStr = day.format('YYYY-MM-DD');
         // An entry clipped by midnight appears in both its days; the set keeps it counted once
@@ -238,15 +243,8 @@ const dayHeaderSyncStates = computed<Record<string, 'synced' | 'outdated' | 'att
             ...new Set((eventsByDay.value[dayStr] ?? []).map((dayEvent) => dayEvent.event.id)),
         ];
         const worst = worstExternalSyncBadge(entryIds, badges);
-        if (worst === null) {
-            continue;
-        }
-        if (worst.state === 'synced') {
-            states[dayStr] = 'synced';
-        } else if (entryIds.some((id) => badges[id]?.state === 'outdated')) {
-            states[dayStr] = 'outdated';
-        } else {
-            states[dayStr] = 'attention';
+        if (worst !== null) {
+            states[dayStr] = worst.state === 'pending' ? 'attention' : worst.state;
         }
     }
 

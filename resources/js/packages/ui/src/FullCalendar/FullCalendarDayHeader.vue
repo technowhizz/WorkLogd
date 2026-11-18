@@ -3,6 +3,7 @@ import { computed, inject, type ComputedRef } from 'vue';
 import { formatHumanReadableDuration } from '../utils/time';
 import type { Organization } from '@/packages/api/src';
 import type { Dayjs } from 'dayjs';
+import type { DaySyncStatus } from '../TimeEntry/externalSyncTypes';
 
 const props = defineProps<{
     date: Dayjs;
@@ -10,28 +11,36 @@ const props = defineProps<{
     breakSeconds?: number;
     isToday?: boolean;
     /**
-     * The day's external sync state, when the page tracks one: 'synced' when everything with a
-     * status is logged, 'outdated' when any entry is outdated, 'attention' when anything else is
-     * not logged, null when there is nothing to say.
+     * The day's external sync state, when the page tracks one: the state of its most severe
+     * entry, with pending read as 'attention'. Null when there is nothing to say.
      */
-    syncStatus?: 'synced' | 'outdated' | 'attention' | null;
+    syncStatus?: DaySyncStatus | null;
 }>();
 
-const SYNC_DOT = {
+// The same colours as the entry dots (ExternalSyncIndicator), so the header points at the
+// worst entry under it
+const SYNC_DOT: Record<DaySyncStatus, { classes: string; label: string }> = {
     synced: {
         classes: 'bg-green-500 dark:bg-green-400',
         label: 'Everything with a ticket on this day is logged',
-    },
-    // Same amber as an outdated entry's own dot, so the header points at it
-    outdated: {
-        classes: 'bg-amber-500 dark:bg-amber-400',
-        label: 'Something on this day has changed since it was logged',
     },
     attention: {
         classes: 'bg-text-quaternary',
         label: 'Something on this day is not logged yet',
     },
-} as const;
+    outdated: {
+        classes: 'bg-amber-500 dark:bg-amber-400',
+        label: 'Something on this day has changed since it was logged',
+    },
+    'missing-reference': {
+        classes: 'bg-red-500 dark:bg-red-400',
+        label: 'Something on this day has no ticket',
+    },
+    error: {
+        classes: 'bg-red-500 dark:bg-red-400',
+        label: 'Something on this day failed to log',
+    },
+};
 
 const syncDot = computed(() => (props.syncStatus ? SYNC_DOT[props.syncStatus] : null));
 
@@ -71,8 +80,8 @@ const durationSummary = computed(() => {
             :class="isToday ? 'font-semibold' : 'font-medium'">
             <!--
                 The day's sync state at a glance, so a week can be scanned for unlogged work
-                without opening the sync dialog. All logged, something outdated, or otherwise
-                worth a look - the per-entry dots carry the detail of what and why.
+                without opening the sync dialog. It takes the colour of the day's worst entry -
+                the per-entry dots carry the detail of what and why.
             -->
             <span
                 v-if="syncDot"

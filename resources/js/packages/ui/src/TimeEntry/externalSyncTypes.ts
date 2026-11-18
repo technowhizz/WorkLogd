@@ -27,6 +27,12 @@ export interface ExternalSyncBadge {
 export type ExternalSyncBadges = Record<string, ExternalSyncBadge>;
 
 /**
+ * A whole day's sync state, for the calendar day header: the state of its most severe entry, so
+ * the header dot is the same colour as the worst dot under it. Pending reads as 'attention'.
+ */
+export type DaySyncStatus = 'synced' | 'attention' | 'outdated' | 'missing-reference' | 'error';
+
+/**
  * A reference to an item in an external tracker that a description points at, ex. a Jira issue.
  */
 export interface ExternalReference {
