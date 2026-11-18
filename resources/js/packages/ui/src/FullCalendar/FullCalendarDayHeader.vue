@@ -11,10 +11,29 @@ const props = defineProps<{
     isToday?: boolean;
     /**
      * The day's external sync state, when the page tracks one: 'synced' when everything with a
-     * status is logged, 'attention' when anything is not, null when there is nothing to say.
+     * status is logged, 'outdated' when any entry is outdated, 'attention' when anything else is
+     * not logged, null when there is nothing to say.
      */
-    syncStatus?: 'synced' | 'attention' | null;
+    syncStatus?: 'synced' | 'outdated' | 'attention' | null;
 }>();
+
+const SYNC_DOT = {
+    synced: {
+        classes: 'bg-green-500 dark:bg-green-400',
+        label: 'Everything with a ticket on this day is logged',
+    },
+    // Same amber as an outdated entry's own dot, so the header points at it
+    outdated: {
+        classes: 'bg-amber-500 dark:bg-amber-400',
+        label: 'Something on this day has changed since it was logged',
+    },
+    attention: {
+        classes: 'bg-text-quaternary',
+        label: 'Something on this day is not logged yet',
+    },
+} as const;
+
+const syncDot = computed(() => (props.syncStatus ? SYNC_DOT[props.syncStatus] : null));
 
 const totalSecondsValue = computed(() => props.totalSeconds ?? 0);
 const breakSecondsValue = computed(() => props.breakSeconds ?? 0);
@@ -52,27 +71,15 @@ const durationSummary = computed(() => {
             :class="isToday ? 'font-semibold' : 'font-medium'">
             <!--
                 The day's sync state at a glance, so a week can be scanned for unlogged work
-                without opening the sync dialog. Two states only: all logged, or worth a look -
-                the per-entry dots carry the detail of what and why.
+                without opening the sync dialog. All logged, something outdated, or otherwise
+                worth a look - the per-entry dots carry the detail of what and why.
             -->
             <span
-                v-if="syncStatus"
+                v-if="syncDot"
                 class="h-2 w-2 shrink-0 rounded-full"
-                :class="
-                    syncStatus === 'synced'
-                        ? 'bg-green-500 dark:bg-green-400'
-                        : 'bg-text-quaternary'
-                "
-                :title="
-                    syncStatus === 'synced'
-                        ? 'Everything with a ticket on this day is logged'
-                        : 'Something on this day is not logged yet'
-                "
-                :aria-label="
-                    syncStatus === 'synced'
-                        ? 'Everything with a ticket on this day is logged'
-                        : 'Something on this day is not logged yet'
-                "
+                :class="syncDot.classes"
+                :title="syncDot.label"
+                :aria-label="syncDot.label"
                 role="img"
                 data-testid="day_sync_indicator"
                 :data-sync-state="syncStatus"></span>

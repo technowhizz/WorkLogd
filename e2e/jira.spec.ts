@@ -707,8 +707,8 @@ test('test that the calendar shows pending, synced and outdated states', async (
         2
     );
     await expect(page.getByTestId('sync_indicator_synced').locator('visible=true')).toHaveCount(0);
-    // And the day is no longer fully logged, so its header dot goes back to grey
-    await expect(todayHeaderDot).toHaveAttribute('data-sync-state', 'attention');
+    // And the day now holds outdated entries, so its header dot turns orange to match them
+    await expect(todayHeaderDot).toHaveAttribute('data-sync-state', 'outdated');
 });
 
 test('test that changing the ticket number reads as outdated, not as never logged', async ({

@@ -4,7 +4,7 @@ import { mount } from '@vue/test-utils';
 import FullCalendarDayHeader from './FullCalendarDayHeader.vue';
 import { getLocalizedDayJs } from '../utils/time';
 
-function mountHeader(syncStatus: 'synced' | 'attention' | null) {
+function mountHeader(syncStatus: 'synced' | 'outdated' | 'attention' | null) {
     return mount(FullCalendarDayHeader, {
         props: {
             date: getLocalizedDayJs('2026-08-10T00:00:00Z'),
@@ -30,6 +30,14 @@ describe('FullCalendarDayHeader sync dot', () => {
         expect(dot.attributes('data-sync-state')).toBe('synced');
         expect(dot.classes()).toContain('bg-green-500');
         expect(dot.attributes('title')).toContain('is logged');
+    });
+
+    it('shows an orange dot when something on the day is outdated', () => {
+        const dot = mountHeader('outdated').get('[data-testid="day_sync_indicator"]');
+
+        expect(dot.attributes('data-sync-state')).toBe('outdated');
+        expect(dot.classes()).toContain('bg-amber-500');
+        expect(dot.attributes('title')).toContain('changed since it was logged');
     });
 
     it('shows a grey dot when something on the day is not logged', () => {

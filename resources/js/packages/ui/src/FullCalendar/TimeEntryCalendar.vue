@@ -219,17 +219,18 @@ const {
 
 /*
  * One sync state per day for the header: 'synced' when everything with a badge that day is
- * logged, 'attention' when anything is not, absent when the day has nothing to say - no
- * badged entries, or the page tracks no external references at all. Collapsing through
+ * logged, 'outdated' when any entry that day is outdated (so the header matches its orange
+ * dot), 'attention' when anything else is not logged, absent when the day has nothing to say -
+ * no badged entries, or the page tracks no external references at all. Collapsing through
  * worstExternalSyncBadge keeps this in step with how rows and cells summarise groups.
  */
-const dayHeaderSyncStates = computed<Record<string, 'synced' | 'attention'>>(() => {
+const dayHeaderSyncStates = computed<Record<string, 'synced' | 'outdated' | 'attention'>>(() => {
     const badges = props.externalSyncBadges;
     if (!badges || Object.keys(badges).length === 0) {
         return {};
     }
 
-    const states: Record<string, 'synced' | 'attention'> = {};
+    const states: Record<string, 'synced' | 'outdated' | 'attention'> = {};
     for (const day of viewDays.value) {
         const dayStr = day.format('YYYY-MM-DD');
         // An entry clipped by midnight appears in both its days; the set keeps it counted once
@@ -237,8 +238,15 @@ const dayHeaderSyncStates = computed<Record<string, 'synced' | 'attention'>>(() 
             ...new Set((eventsByDay.value[dayStr] ?? []).map((dayEvent) => dayEvent.event.id)),
         ];
         const worst = worstExternalSyncBadge(entryIds, badges);
-        if (worst !== null) {
-            states[dayStr] = worst.state === 'synced' ? 'synced' : 'attention';
+        if (worst === null) {
+            continue;
+        }
+        if (worst.state === 'synced') {
+            states[dayStr] = 'synced';
+        } else if (entryIds.some((id) => badges[id]?.state === 'outdated')) {
+            states[dayStr] = 'outdated';
+        } else {
+            states[dayStr] = 'attention';
         }
     }
 
